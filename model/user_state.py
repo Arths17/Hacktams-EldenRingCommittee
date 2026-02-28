@@ -192,10 +192,17 @@ PROTOCOL_CONFLICTS: list[frozenset] = [
 def _parse_sleep_hours(profile: dict) -> Optional[float]:
     """Extract numeric sleep hours from the sleep_schedule profile field."""
     raw = profile.get("sleep_schedule", "")
-    cleaned = raw.lower().replace("–", "-").replace("—", "-").replace(" to ", "-")
-    pattern = r"(\d{1,2}(?::\d{2})?)\s*(am|pm)\s*-\s*(\d{1,2}(?::\d{2})?)\s*(am|pm)"
-    m = re.search(pattern, cleaned)
-    if not m:
+    cleaned = raw.lower()
+    cleaned = cleaned.replace("–", "-").replace("—", "-")
+    cleaned = re.sub(r"\bto\b",   "-", cleaned)
+    cleaned = re.sub(r"\band\b",  "-", cleaned)
+    cleaned = re.sub(r"\bwake\s*(up)?\b", "-", cleaned)
+    cleaned = re.sub(r"\buntil\b", "-", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned)
+
+    time_pat = r"(\d{1,2}(?::\d{2})?)\s*(am|pm)"
+    times = re.findall(time_pat, cleaned)
+    if len(times) < 2:
         return None
 
     def _to_h(time_str: str, ampm: str) -> float:
@@ -208,9 +215,12 @@ def _parse_sleep_hours(profile: dict) -> Optional[float]:
             h = 0
         return h + mins / 60.0
 
-    bed  = _to_h(m.group(1), m.group(2))
-    wake = _to_h(m.group(3), m.group(4))
-    return round((24 - bed + wake) if bed > wake else (wake - bed), 1)
+    bed  = _to_h(times[0][0], times[0][1])
+    wake = _to_h(times[1][0], times[1][1])
+    hours = (24 - bed + wake) if bed > wake else (wake - bed)
+    if hours == 0 or hours > 23:
+        return None
+    return round(hours, 1)
 
 
 def _infer_mental_state(profile: dict) -> list[str]:
