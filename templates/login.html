@@ -1,18 +1,63 @@
 <!DOCTYPE html>
-
 <html>
     <head>
         <meta charset="UTF-8">
-        <style>
-            title {
-                alignment: center;
-                text-size: 20px;
-            }
-        </style>
-
+        <link rel="stylesheet" href="/static/login.css">
         <title>Login</title>
     </head> 
+    <body>
+        <h1 class="header1">Login</h1>
+        <div id="message" class="message"></div>
+        <form id="loginForm">
+            <div class="login">
+                <input type="text" id="username" name="username" placeholder="Username" required><br><br>
+                <input type="password" id="password" name="password" placeholder="Password" required><br><br>
+                <button type="submit">Login</button>
+            </div>
+        </form>
+
+        <script>
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const messageDiv = document.getElementById('message');
+                
+                // Clear previous message
+                messageDiv.textContent = '';
+                messageDiv.className = 'message';
+                
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                try {
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        messageDiv.textContent = '✓ Login successful! Redirecting...';
+                        messageDiv.className = 'message success';
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        messageDiv.textContent = '✗ Invalid username or password. Please try again.';
+                        messageDiv.className = 'message error';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    messageDiv.textContent = '✗ An error occurred. Please try again.';
+                    messageDiv.className = 'message error';
+                }
+            });
+        </script>
+    </body>
 </html>    
 
 
-    
