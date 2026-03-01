@@ -7,6 +7,35 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const AppContext = createContext();
 
+async function parseApiResponse(response, fallbackMessage) {
+  const rawText = await response.text();
+  let data = null;
+
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = null;
+  }
+
+  const explicitError =
+    data?.error ||
+    data?.detail ||
+    data?.message ||
+    data?.error_code;
+
+  if (!response.ok || data?.success === false) {
+    const fallback = `${fallbackMessage} (${response.status})`;
+    const nonJsonHint = !data && rawText ? ` ${rawText.slice(0, 120)}` : "";
+    return {
+      ok: false,
+      error: explicitError || `${fallback}${nonJsonHint}`,
+      data: data || {},
+    };
+  }
+
+  return { ok: true, data: data || {} };
+}
+
 function getLastNDates(n) {
   const dates = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -273,13 +302,13 @@ export function AppProvider({ children }) {
         },
         body: JSON.stringify(mealData)
       });
-      const data = await response.json();
+      const parsed = await parseApiResponse(response, "Failed to save meal");
       
-      if (data.success) {
+      if (parsed.ok && parsed.data?.success !== false) {
         await refreshMealData(token);
         return { success: true };
       }
-      return { success: false, error: data.error };
+      return { success: false, error: parsed.error || "Failed to save meal" };
     } catch (error) {
       console.error("Failed to add meal:", error);
       return { success: false, error: error.message };
@@ -300,13 +329,13 @@ export function AppProvider({ children }) {
         },
         body: JSON.stringify(mealData)
       });
-      const data = await response.json();
+      const parsed = await parseApiResponse(response, "Failed to update meal");
 
-      if (data.success) {
+      if (parsed.ok && parsed.data?.success !== false) {
         await refreshMealData(token);
         return { success: true };
       }
-      return { success: false, error: data.error };
+      return { success: false, error: parsed.error || "Failed to update meal" };
     } catch (error) {
       console.error("Failed to update meal:", error);
       return { success: false, error: error.message };
@@ -325,13 +354,13 @@ export function AppProvider({ children }) {
           "ngrok-skip-browser-warning": "true"
         }
       });
-      const data = await response.json();
+      const parsed = await parseApiResponse(response, "Failed to delete meal");
       
-      if (data.success) {
+      if (parsed.ok && parsed.data?.success !== false) {
         await refreshMealData(token);
         return { success: true };
       }
-      return { success: false, error: data.error };
+      return { success: false, error: parsed.error || "Failed to delete meal" };
     } catch (error) {
       console.error("Failed to delete meal:", error);
       return { success: false, error: error.message };
