@@ -55,8 +55,6 @@ except Exception as e:
     USE_SUPABASE = False
     logger.info(f"✗ Supabase unavailable: {e} (using local fallback)")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
-
 # Import exceptions and models (with graceful fallback)
 # Define fallback classes first
 class HealthOSAPIError(Exception):
@@ -214,7 +212,7 @@ except ImportError:
 
 # Import churn prediction model
 try:
-    from churn_prediction import churn_predictor as _churn_predictor
+    from model.churn_prediction import churn_predictor as _churn_predictor
     churn_predictor = _churn_predictor
     logger.info("✓ Churn prediction model loaded")
 except ImportError as e:
@@ -423,8 +421,7 @@ async def health_check():
     
     # Check nutrition DB
     try:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
-        import nutrition_db
+        from model import nutrition_db
         services["nutrition_db"] = "healthy" if nutrition_db.is_loaded() else "loading"
     except Exception as e:
         services["nutrition_db"] = f"error: {str(e)[:30]}"
@@ -873,6 +870,59 @@ async def predict_churn(request: Request):
 
 
 @app.get(
+    "/api/churn-risk/cohort",
+    tags=["Churn Prediction"],
+    summary="Get at-risk user cohort",
+    description="Get list of users at risk of churn above threshold",
+)
+async def get_at_risk_cohort(request: Request, threshold: float = 0.5):
+    """Get cohort of users at risk of churn.
+    
+    Parameters:
+    - threshold: Churn probability threshold (0.0-1.0), default 0.5
+    
+    In production, this would query Supabase:
+    SELECT * FROM churn_features WHERE churn_risk_score >= threshold
+    ORDER BY churn_risk_score DESC
+    """
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        if threshold < 0 or threshold > 1:
+            return JSONResponse(
+                {"success": False, "error": "Threshold must be between 0 and 1", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+        
+        # In production:
+        # result = _sb.table("churn_features") \
+        #     .select("*") \
+        #     .gte("churn_risk_score", threshold) \
+        #     .order("churn_risk_score", desc=True) \
+        #     .execute()
+        # return JSONResponse({"success": True, "data": result.data})
+        
+        return JSONResponse({
+            "success": True,
+            "data": [],
+            "threshold": threshold,
+            "count": 0
+        }, status_code=200)
+    
+    except Exception as e:
+        logger.error(f"Get at-risk cohort error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.get(
     "/api/churn-risk/{user_id}",
     tags=["Churn Prediction"],
     summary="Get user churn risk",
@@ -903,60 +953,6 @@ async def get_user_churn_risk(user_id: str, request: Request):
         )
     except Exception as e:
         logger.error(f"Get churn risk error: {e}", exc_info=True)
-        return JSONResponse(
-            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
-            status_code=500,
-        )
-
-
-@app.get(
-    "/api/churn-risk/cohort",
-    tags=["Churn Prediction"],
-    summary="Get at-risk user cohort",
-    description="Get list of users at risk of churn above threshold",
-)
-async def get_at_risk_cohort(threshold: float = 0.5, request: Optional[Request] = None):
-    """Get cohort of users at risk of churn.
-    
-    Parameters:
-    - threshold: Churn probability threshold (0.0-1.0), default 0.5
-    
-    In production, this would query Supabase:
-    SELECT * FROM churn_features WHERE churn_risk_score >= threshold
-    ORDER BY churn_risk_score DESC
-    """
-    try:
-        if request:
-            payload = _decode_token(request)
-            if not payload:
-                return JSONResponse(
-                    {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
-                    status_code=401,
-                )
-        
-        if threshold < 0 or threshold > 1:
-            return JSONResponse(
-                {"success": False, "error": "Threshold must be between 0 and 1", "error_code": "VALIDATION_ERROR"},
-                status_code=422,
-            )
-        
-        # In production:
-        # result = _sb.table("churn_features") \
-        #     .select("*") \
-        #     .gte("churn_risk_score", threshold) \
-        #     .order("churn_risk_score", desc=True) \
-        #     .execute()
-        # return JSONResponse({"success": True, "data": result.data})
-        
-        return JSONResponse({
-            "success": True,
-            "data": [],
-            "threshold": threshold,
-            "count": 0
-        }, status_code=200)
-    
-    except Exception as e:
-        logger.error(f"Get at-risk cohort error: {e}", exc_info=True)
         return JSONResponse(
             {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
             status_code=500,
