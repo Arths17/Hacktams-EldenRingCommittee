@@ -4,6 +4,7 @@
   "description": "CampusFuel - Campus Nutrition Tracker",
   "scripts": {
     "dev": "next dev",
+    "buiild": "next build",
     "build": "next build",
     "start": "next start",
     "backend": "python -m uvicorn main:app --reload --port 8000"
