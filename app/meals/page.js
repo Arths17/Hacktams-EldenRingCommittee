@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useApp } from "../context/AppContext";
 import CampusFuelNav from "../components/Navbar/CampusFuelNav";
@@ -75,7 +75,7 @@ function computeNutritionGoals(profile) {
   return { calories: calorieGoal, protein, carbs, fat };
 }
 
-export default function MealsPage() {
+function MealsPageContent() {
   const { user, userProfile, todayMeals, mealsLoading, addMeal: addMealToContext, updateMeal: updateMealInContext, deleteMeal: deleteMealFromContext } = useApp();
   const searchParams = useSearchParams();
 
@@ -427,5 +427,13 @@ export default function MealsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MealsPage() {
+  return (
+    <Suspense fallback={null}>
+      <MealsPageContent />
+    </Suspense>
   );
 }
