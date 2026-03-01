@@ -36,6 +36,12 @@ async function parseApiResponse(response, fallbackMessage) {
   return { ok: true, data: data || {} };
 }
 
+function isNotFoundError(errorMessage) {
+  if (!errorMessage) return false;
+  const msg = String(errorMessage).toLowerCase();
+  return msg.includes("not found") || msg.includes("(404)") || msg.includes(" 404");
+}
+
 function getLastNDates(n) {
   const dates = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -194,6 +200,41 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [mealsLoading, setMealsLoading] = useState(false);
 
+  const getLocalMealsKey = () => `cf-local-meals-${user?.username || "anon"}`;
+
+  const syncMealState = (meals) => {
+    const normalizedMeals = (meals || [])
+      .map((meal) => ({
+        ...meal,
+        id: meal.id || meal.timestamp,
+      }))
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+    setAllMeals(normalizedMeals);
+    setTodayMeals(deriveTodayMeals(normalizedMeals));
+    setWeeklyMeals(deriveWeeklyMeals(normalizedMeals));
+    setActivityMetrics(deriveActivityMetrics(normalizedMeals));
+  };
+
+  const loadLocalMealsCache = () => {
+    try {
+      const raw = localStorage.getItem(getLocalMealsKey());
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveLocalMealsCache = (meals) => {
+    try {
+      localStorage.setItem(getLocalMealsKey(), JSON.stringify(meals || []));
+    } catch {
+      // no-op if storage is unavailable
+    }
+  };
+
   // Initialize auth and fetch user data
   useEffect(() => {
     const publicPaths = ["/", "/login", "/signup"];
@@ -254,23 +295,20 @@ export function AppProvider({ children }) {
           "ngrok-skip-browser-warning": "true"
         }
       });
-      const data = await response.json();
-      
-      if (data.success && data.meals) {
-        const normalizedMeals = (data.meals || [])
-          .map((meal) => ({
-            ...meal,
-            id: meal.id || meal.timestamp,
-          }))
-          .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      const parsed = await parseApiResponse(response, "Failed to load meals");
 
-        setAllMeals(normalizedMeals);
-        setTodayMeals(deriveTodayMeals(normalizedMeals));
-        setWeeklyMeals(deriveWeeklyMeals(normalizedMeals));
-        setActivityMetrics(deriveActivityMetrics(normalizedMeals));
+      if (parsed.ok && parsed.data?.success !== false) {
+        const serverMeals = parsed.data?.meals || [];
+        syncMealState(serverMeals);
+        saveLocalMealsCache(serverMeals);
+      } else if (isNotFoundError(parsed.error)) {
+        const localMeals = loadLocalMealsCache();
+        syncMealState(localMeals);
       }
     } catch (error) {
       console.error("Failed to refresh meals:", error);
+      const localMeals = loadLocalMealsCache();
+      syncMealState(localMeals);
     } finally {
       setMealsLoading(false);
     }
@@ -308,10 +346,38 @@ export function AppProvider({ children }) {
         await refreshMealData(token);
         return { success: true };
       }
+
+      if (isNotFoundError(parsed.error)) {
+        const fallbackMeal = {
+          ...mealData,
+          id: mealData.id || crypto.randomUUID(),
+          timestamp: mealData.timestamp || new Date().toISOString(),
+          date: mealData.date || new Date().toISOString().split("T")[0],
+          source: "local-fallback",
+        };
+        const nextMeals = [fallbackMeal, ...allMeals];
+        syncMealState(nextMeals);
+        saveLocalMealsCache(nextMeals);
+        return { success: true, warning: "Saved locally because backend meals route returned Not Found" };
+      }
+
       return { success: false, error: parsed.error || "Failed to save meal" };
     } catch (error) {
       console.error("Failed to add meal:", error);
-      return { success: false, error: error.message };
+      const fallbackMeal = {
+        ...mealData,
+        id: mealData.id || crypto.randomUUID(),
+        timestamp: mealData.timestamp || new Date().toISOString(),
+        date: mealData.date || new Date().toISOString().split("T")[0],
+        source: "local-fallback",
+      };
+      const nextMeals = [fallbackMeal, ...allMeals];
+      syncMealState(nextMeals);
+      saveLocalMealsCache(nextMeals);
+      return {
+        success: true,
+        warning: `Saved locally: ${error.message || "Backend unavailable"}`,
+      };
     }
   };
 
