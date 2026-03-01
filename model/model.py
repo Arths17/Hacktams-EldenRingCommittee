@@ -979,13 +979,27 @@ def main():
             top_3 = ", ".join(p.replace("_protocol", "") for p, _ in prioritized[:3])
             print(f"  📊  Feedback recorded {feedback} — top protocols: [{top_3}]\n")
 
+        # ── Meal Swap Detection ────────────────────────────────────
+        from meal_swap import detect_swap_request, find_swaps, format_swap_block as _fmt_swap
+        _rejected = detect_swap_request(user_input)
+        _swap_block = ""
+        if _rejected and nutrition_db.is_loaded():
+            _active_protos = [p for p, _ in prioritized[:5]]
+            _swaps = find_swaps(_rejected, constraint_graph=_cg,
+                                active_protocols=_active_protos, n=5)
+            _swap_block = _fmt_swap(_rejected, _swaps, constraint_graph=_cg)
+            if _swaps:
+                print(f"  🔄  Swap engine: {len(_swaps)} substitutes found for '{_rejected}'")
+
         # RAG: fetch foods relevant to this specific follow-up query
         _rag_ctx = rag.query(user_input, [p for p, _ in prioritized[:5]], n=8,
                              constraint_graph=_cg)
         _send    = (
-            f"[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
-            if _rag_ctx else user_input
+            f"{_swap_block}\n\n[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
+            if _rag_ctx or _swap_block else user_input
         )
+        if _swap_block and not _rag_ctx:
+            _send = f"{_swap_block}\n\n{user_input}"
 
         print("\n⏳  Thinking…\n")
         try:

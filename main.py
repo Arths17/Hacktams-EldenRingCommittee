@@ -209,16 +209,37 @@ async def chat(request: Request):
 
     def generate():
         try:
-            import ollama
+            import ollama, sys, os
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "model"))
             from model import MODEL_NAME, build_full_context
+            from constraint_graph import ConstraintGraph
+            from validation import parse_profile as _parse_profile
+            from meal_swap import detect_swap_request, find_swaps, format_swap_block
+            import nutrition_db, rag, user_state
 
             system_full, seed_message = build_full_context(profile, username)
+
+            # ── Meal swap injection ────────────────────────────────────
+            _swap_prefix = ""
+            _rejected = detect_swap_request(message)
+            if _rejected and nutrition_db.is_loaded():
+                _pp = _parse_profile(profile)
+                _cg = ConstraintGraph.from_parsed_profile(_pp)
+                _state       = user_state.analyze_user_state(profile)
+                _protocols   = user_state.map_state_to_protocols(_state)
+                _prioritized = user_state.prioritize_protocols(_protocols, _state, {})
+                _active_p    = [p for p, _ in _prioritized[:5]]
+                _swaps = find_swaps(_rejected, constraint_graph=_cg,
+                                    active_protocols=_active_p, n=5)
+                _swap_prefix = format_swap_block(_rejected, _swaps, constraint_graph=_cg)
+
+            _final_message = f"{_swap_prefix}\n\n{message}" if _swap_prefix else message
 
             messages = [
                 {"role": "system", "content": system_full},
                 {"role": "user",   "content": seed_message},
                 {"role": "assistant", "content": "Understood. I have your full profile, state analysis, protocol priorities, and nutrition data loaded."},
-                {"role": "user",   "content": message},
+                {"role": "user",   "content": _final_message},
             ]
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:
