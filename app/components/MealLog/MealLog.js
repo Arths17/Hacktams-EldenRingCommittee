@@ -34,7 +34,7 @@ export default function MealLog() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>Today&apos;s Meal Log</h2>
-        <a href="/meals" className={styles.addBtn}>+ Add Meal</a>
+        <a href="/meals?add=true" className={styles.addBtn}>+ Add Meal</a>
       </div>
       <div className={styles.list}>
         {mealsLoading ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useApp } from "../context/AppContext";
 import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
@@ -76,8 +77,9 @@ function computeNutritionGoals(profile) {
 
 export default function MealsPage() {
   const { user, userProfile, todayMeals, mealsLoading, addMeal: addMealToContext, updateMeal: updateMealInContext, deleteMeal: deleteMealFromContext } = useApp();
+  const searchParams = useSearchParams();
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(searchParams.get('add') === 'true');
   const [editingMealId, setEditingMealId] = useState(null);
   const [newMeal, setNewMeal] = useState({
     type: "Breakfast",
