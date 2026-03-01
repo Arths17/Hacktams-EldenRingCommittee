@@ -692,6 +692,94 @@ def load_research_context() -> str:
 
 
 # ──────────────────────────────────────────────
+# FULL CONTEXT BUILDER  (used by web /api/chat)
+# Runs the COMPLETE pipeline:
+#   analyze_profile → user_state vector → protocol prioritization
+#   → constraint solver → session memory → RAG foods → research stats
+# Returns (system_prompt_str, seed_message_str) ready to inject into Ollama.
+# ──────────────────────────────────────────────
+def build_full_context(profile: dict, username: str) -> tuple[str, str]:
+    """
+    Run the full HealthOS intelligence pipeline and return
+    (system_full, seed_message) for the Ollama chat call.
+
+    Pipeline:
+      Stage 0 · Validation + Ontology  — parse_profile → ParsedProfile
+      Stage 0b· Constraint Graph       — ConstraintGraph.from_parsed_profile
+      Stage 1 · Nutrition DB + RAG     — load + build index
+      Stage 2 · Core Analysis          — analyze_profile
+      Stage 3 · User State Vector      — analyze_user_state
+      Stage 4 · Protocol Prioritization— prioritize_protocols + constraint_result
+      Stage 5 · Session Memory         — last 7 days check-ins
+      Stage 6 · RAG Food Retrieval     — semantic query filtered by constraint graph
+      Stage 7 · Research Context       — sleep + student MH evidence stats
+      Stage 8 · Assemble               — system_full + seed_message
+    """
+    _MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    # ── Stage 0: Validation + Ontology Mapping ─────────────────
+    from validation import parse_profile as _parse_profile
+    from constraint_graph import ConstraintGraph
+
+    pp = _parse_profile(profile)
+    cg = ConstraintGraph.from_parsed_profile(pp)
+
+    # ── Stage 1: Load nutrition DB + RAG ───────────────────────
+    nutrition_index_path = os.path.join(_MODEL_DIR, "nutrition_index.json")
+    nutrition_db.load(nutrition_index_path)
+    rag.build(nutrition_index_path)
+
+    # ── Stage 2: Core analysis ──────────────────────────────────
+    analysis = analyze_profile(profile)
+
+    # ── Stage 3: User state vector ──────────────────────────────
+    state           = user_state.analyze_user_state(profile)
+    protocols       = user_state.map_state_to_protocols(state)
+    constraints     = user_state.build_constraints_from_profile(profile)
+    learned_weights = user_state.load_feedback_weights(username)
+
+    # ── Stage 4: Protocol prioritization + constraint solver ────
+    prioritized       = user_state.prioritize_protocols(protocols, state, learned_weights)
+    constraint_result = user_state.solve_constraints(prioritized, constraints, state)
+    nutrient_targets  = user_state.protocols_to_nutrients(
+        {p: s for p, s in prioritized[:10]}
+    )
+    priority_block = user_state.format_priority_block(
+        prioritized, nutrient_targets, constraint_result
+    )
+
+    # ── Stage 5: Session memory ─────────────────────────────────
+    recent_logs = session_memory.load_recent_logs(username)
+    memory_ctx  = session_memory.format_memory_context(recent_logs)
+
+    # ── Stage 6: RAG — constrained semantic food retrieval ──────
+    # Use constraint graph's typed protocol list as the retrieval signal
+    active_protocols = cg.active_protocols
+    seed_query       = (
+        f"{pp.goal.value} {pp.stress_state.value} {pp.energy_state.value} "
+        f"{pp.sleep_quality.value} health plan"
+    )
+    nutrition_ctx = rag.query(
+        seed_query, active_protocols[:5], n=15, constraint_graph=cg
+    )
+    if not nutrition_ctx:
+        nutrition_ctx = nutrition_db.build_nutrition_context(profile)
+
+    # ── Stage 7: Research context ───────────────────────────────
+    research_ctx = load_research_context()
+
+    # ── Stage 8: Assemble ───────────────────────────────────────
+    # Inject constraint graph block between system prompt and research context
+    constraint_block = cg.to_prompt_block()
+    system_full      = SYSTEM_PROMPT + constraint_block + research_ctx
+    seed_message     = profile_to_context(
+        profile, analysis, priority_block, nutrition_ctx, memory_ctx
+    )
+
+    return system_full, seed_message
+
+
+# ──────────────────────────────────────────────
 # MAIN
 # ──────────────────────────────────────────────
 def main():

@@ -115,17 +115,19 @@ def build(nutrition_index_path: str) -> bool:
     return True
 
 
-def query(user_message: str, active_protocols: list, n: int = 12) -> str:
+def query(user_message: str, active_protocols: list, n: int = 12,
+          constraint_graph=None) -> str:
     """
     Return a compact nutrition context string for prompt injection.
     Semantic search when chromadb is ready; tag-based fallback otherwise.
+    constraint_graph: optional ConstraintGraph — filters forbidden foods before injection.
     Returns empty string if no index is loaded.
     """
     if not _fallback_index:
         return ""
     if _chroma_ready and _collection is not None:
-        return _semantic_query(user_message, active_protocols, n)
-    return _tag_fallback(active_protocols, n)
+        return _semantic_query(user_message, active_protocols, n, constraint_graph)
+    return _tag_fallback(active_protocols, n, constraint_graph)
 
 
 def is_ready() -> bool:
@@ -140,24 +142,33 @@ def is_loaded() -> bool:
 # INTERNAL HELPERS
 # ──────────────────────────────────────────────
 
-def _semantic_query(user_message: str, active_protocols: list, n: int) -> str:
+def _semantic_query(user_message: str, active_protocols: list, n: int,
+                    constraint_graph=None) -> str:
     q = user_message
     if active_protocols:
         q += " " + " ".join(p.replace("_protocol", "") for p in active_protocols[:5])
 
     try:
         count   = _collection.count()
-        results = _collection.query(query_texts=[q], n_results=min(n, count))
+        # Fetch extra results so we have headroom after constraint filtering
+        fetch_n = min(n * 3, count)
+        results = _collection.query(query_texts=[q], n_results=fetch_n)
     except Exception:
-        return _tag_fallback(active_protocols, n)
+        return _tag_fallback(active_protocols, n, constraint_graph)
 
     foods = _fallback_index.get("foods", {})
     lines = ["\n🥗  RELEVANT FOODS (semantic search):"]
+    shown = 0
 
     for meta in (results.get("metadatas") or [[]])[0]:
+        if shown >= n:
+            break
         name = meta.get("name", "")
         rec  = foods.get(name, {})
         if not rec:
+            continue
+        # ── Constraint graph filter ──────────────────────────────
+        if constraint_graph is not None and not constraint_graph.allows_food(rec):
             continue
         cal = rec.get("calories",  0) or 0
         p   = rec.get("protein_g", 0) or 0
@@ -169,11 +180,12 @@ def _semantic_query(user_message: str, active_protocols: list, n: int) -> str:
             f"  • {name}: {cal:.0f}kcal | P{p:.1f}g C{c:.1f}g F{f:.1f}g Fb{fb:.1f}g"
             + (f"  [{tgs}]" if tgs else "")
         )
+        shown += 1
 
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def _tag_fallback(active_protocols: list, n: int) -> str:
+def _tag_fallback(active_protocols: list, n: int, constraint_graph=None) -> str:
     tag_index = _fallback_index.get("tag_index", {})
     foods     = _fallback_index.get("foods", {})
     seen: set = set()
@@ -181,15 +193,24 @@ def _tag_fallback(active_protocols: list, n: int) -> str:
     per_proto = max(2, n // max(len(active_protocols or []), 1))
 
     for proto in (active_protocols or [])[:5]:
-        for name in (tag_index.get(proto) or [])[:per_proto]:
+        added = 0
+        for name in (tag_index.get(proto) or []):
+            if added >= per_proto:
+                break
             if name in seen:
                 continue
+            rec = foods.get(name, {})
+            if not rec:
+                continue
+            # ── Constraint graph filter ──────────────────────────
+            if constraint_graph is not None and not constraint_graph.allows_food(rec):
+                continue
             seen.add(name)
-            rec   = foods.get(name, {})
             cal   = rec.get("calories",  0) or 0
             p     = rec.get("protein_g", 0) or 0
             c     = rec.get("carbs_g",   0) or 0
             label = proto.replace("_protocol", "")
             lines.append(f"  • {name}: {cal:.0f}kcal | P{p:.1f}g C{c:.1f}g  [{label}]")
+            added += 1
 
     return "\n".join(lines) if len(lines) > 1 else ""
