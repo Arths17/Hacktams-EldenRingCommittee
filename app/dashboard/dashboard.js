@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "../components/Sidebar/Sidebar";
+import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import StatsCard from "../components/StatsCard/StatsCard";
 import MealLog from "../components/MealLog/MealLog";
@@ -50,7 +50,7 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar />
+      <CampusFuelNav />
       <div className={styles.main}>
         <Header title="Dashboard" username={username || ""} />
         <div className={styles.content}>
