@@ -7,6 +7,7 @@ All passwords are bcrypt-hashed — never stored in plaintext.
 
 import os
 import bcrypt
+from typing import Optional, Any, cast
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -14,7 +15,7 @@ load_dotenv()
 
 _url: str = os.environ.get("SUPABASE_URL", "")
 _key: str = os.environ.get("SUPABASE_KEY", "")
-_db:  Client = None
+_db:  Optional[Client] = None
 
 
 def get_db() -> Client:
@@ -57,7 +58,8 @@ def create_user(username: str, password: str) -> dict:
     result = db.table("users").insert({"username": username, "password": hashed}).execute()
 
     if result.data:
-        return {"success": True, "user_id": result.data[0]["id"]}
+        row = cast(dict[str, Any], result.data[0])
+        return {"success": True, "user_id": row["id"]}
     return {"success": False, "error": "Could not create user"}
 
 
@@ -72,7 +74,7 @@ def login_user(username: str, password: str) -> dict:
     if not result.data:
         return {"success": False, "error": "User not found"}
 
-    user = result.data[0]
+    user = cast(dict[str, Any], result.data[0])
     if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return {"success": False, "error": "Incorrect password"}
 
@@ -109,7 +111,7 @@ def load_profile(user_id: str) -> dict:
     db     = get_db()
     result = db.table("profiles").select("*").eq("user_id", user_id).execute()
     if result.data:
-        row = result.data[0]
+        row = cast(dict[str, Any], result.data[0])
         # Strip Supabase-internal keys
         return {k: v for k, v in row.items() if k not in ("id", "user_id", "updated_at")}
     return {}
@@ -146,7 +148,8 @@ def load_chat_history(user_id: str, limit: int = 20) -> list[dict]:
     )
     if not result.data:
         return []
-    return [{"role": r["role"], "content": r["content"]} for r in reversed(result.data)]
+    rows = cast(list[dict[str, Any]], result.data)
+    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
 
 
 def clear_chat_history(user_id: str) -> bool:
