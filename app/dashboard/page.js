@@ -1,3 +1,7 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Header from "../components/Header/Header";
 import StatsCard from "../components/StatsCard/StatsCard";
@@ -18,17 +22,39 @@ const quickTips = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [username, setUsername] = useState(null);
+  const [profile, setProfile] = useState({});
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) {
+          router.push("/login");
+        } else {
+          setUsername(data.username);
+          setProfile(data.profile || {});
+        }
+      })
+      .catch(() => router.push("/login"));
+  }, []);
+
+  const displayName = profile.name || username || "there";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
   return (
     <div className={styles.layout}>
       <Sidebar />
       <div className={styles.main}>
-        <Header title="Dashboard" />
+        <Header title="Dashboard" username={username || ""} />
         <div className={styles.content}>
 
           {/* Welcome Banner */}
           <div className={styles.banner}>
             <div className={styles.bannerText}>
-              <h2 className={styles.bannerTitle}>Good morning, Jordan! 👋</h2>
+              <h2 className={styles.bannerTitle}>{greeting}, {displayName}! 👋</h2>
               <p className={styles.bannerSub}>
                 You&apos;ve logged <strong>3 meals</strong> today. You&apos;re on track to meet your daily goals.
               </p>

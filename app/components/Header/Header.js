@@ -1,6 +1,9 @@
 import styles from "./Header.module.css";
 
-export default function Header({ title = "Dashboard" }) {
+export default function Header({ title = "Dashboard", username = "" }) {
+  const initials = username
+    ? username.slice(0, 2).toUpperCase()
+    : "?";
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -25,7 +28,7 @@ export default function Header({ title = "Dashboard" }) {
         </div>
         <button className={styles.addBtn}>+ Log Meal</button>
         <div className={styles.avatar}>
-          <span>JD</span>
+          <span>{initials}</span>
         </div>
       </div>
     </header>

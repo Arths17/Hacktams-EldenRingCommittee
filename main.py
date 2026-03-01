@@ -3,7 +3,7 @@ import sys
 import json
 import bcrypt
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
@@ -159,4 +159,58 @@ async def save_profile(request: Request):
     with open("user_profile.json", "w") as f:
         json.dump(data, f, indent=2)
     return JSONResponse({"success": True})
+
+
+@app.post("/api/chat")
+async def chat(request: Request):
+    username = request.session.get("username")
+    if not username:
+        return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
+
+    body = await request.json()
+    message = body.get("message", "").strip()
+    if not message:
+        return JSONResponse({"success": False, "error": "No message provided"})
+
+    # Load profile
+    profile = {}
+    if USE_SUPABASE:
+        try:
+            user_id = request.session.get("user_id")
+            if user_id:
+                res = _sb.table("profiles").select("*").eq("user_id", user_id).execute()
+                if res.data:
+                    profile = res.data[0]
+        except Exception:
+            pass
+    if not profile:
+        try:
+            with open("user_profile.json", "r") as f:
+                profile = json.load(f)
+        except FileNotFoundError:
+            pass
+
+    def generate():
+        try:
+            import ollama
+            import nutrition_db
+            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context
+
+            nutrition_db.load()
+            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
+            system_full = SYSTEM_PROMPT + "\n\n" + profile_to_context(profile) + nutrition_ctx
+
+            messages = [
+                {"role": "system", "content": system_full},
+                {"role": "user",   "content": message},
+            ]
+            stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
+            for chunk in stream:
+                content = chunk["message"]["content"]
+                if content:
+                    yield content
+        except Exception as e:
+            yield f"[Error: {e}]"
+
+    return StreamingResponse(generate(), media_type="text/plain")
 

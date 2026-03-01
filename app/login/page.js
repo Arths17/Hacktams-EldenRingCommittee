@@ -23,6 +23,7 @@ export default function LoginPage() {
 
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 
@@ -30,6 +31,7 @@ export default function LoginPage() {
 
       if (data.success) {
         setMessage({ text: "✓ Login successful! Redirecting...", type: "success" });
+        window.location.href="/app/dashboard/dashboard.js";
         setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         setMessage({ text: "✗ Invalid username or password. Please try again.", type: "error" });
