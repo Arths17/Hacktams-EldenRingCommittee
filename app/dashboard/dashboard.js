@@ -195,7 +195,7 @@ export default function DashboardPage() {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     fetch("/api/me", {
-      headers: { "Authorization": `Bearer ${token}` },
+      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
     })
       .then((r) => r.json())
       .then((data) => {

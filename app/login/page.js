@@ -33,6 +33,7 @@ export default function LoginPage() {
       const response = await fetch("/api/login", {
         method: "POST",
         credentials: "include",
+        headers: { "ngrok-skip-browser-warning": "true" },
         body: formData,
       });
 

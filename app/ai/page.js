@@ -83,6 +83,7 @@ async function getProfile() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
       },
     });
 
@@ -119,6 +120,7 @@ async function sendChatMessage(message, onChunk) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ message }),
       signal: controller.signal,
