@@ -1,0 +1,29 @@
+# Local development files
+.env
+.env.local
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs and databases
+logs/
+model/chroma_db/
+
+# Development artifacts
+.next/
+node_modules/
+out/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test_*.py
+tests/
