@@ -18,15 +18,22 @@
 }
 
 [data-theme="dark"] {
-  --cream: #0e1a12;
-  --white: #152118;
-  --text-dark: #eef3ee;
-  --text-muted: #8fa898;
-  --border: #1e3426;
-  --border-hover: #2a4a38;
-  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-  --card-shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.45);
-  --card-shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.55);
+  --cream: #111318;
+  --white: #1c1f28;
+  --text-dark: #f0efe8;
+  --text-muted: #8b929e;
+  --border: #2c2f3e;
+  --border-hover: #3d4259;
+  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  --card-shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.6);
+  --card-shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.7);
+  /* Keep green/gold vivid in dark mode */
+  --green: #1ecc6e;
+  --green-light: #25e07a;
+  --green-dark: #17a358;
+  --gold: #e0b050;
+  --gold-light: #f0c868;
+  --gold-dark: #c49030;
   color-scheme: dark;
 }
 
