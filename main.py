@@ -137,6 +137,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request/response logging middleware
+import time
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    """Log all HTTP requests and responses with structured JSON."""
+    
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        
+        try:
+            from structured_logging import logger as struct_logger
+            struct_logger.log_request(request.method, request.url.path)
+            logger_available = True
+        except ImportError:
+            logger_available = False
+        
+        response = await call_next(request)
+        
+        if logger_available:
+            elapsed_ms = (time.time() - start_time) * 1000
+            from structured_logging import logger as struct_logger
+            struct_logger.log_response(response.status_code, elapsed_ms)
+        
+        return response
+
+app.add_middleware(LoggingMiddleware)
+
 # Exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -168,8 +196,84 @@ async def healthos_exception_handler(request: Request, exc: HealthOSAPIError):
     return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
 # ══════════════════════════════════════════════
-# HELPER FUNCTIONS
+# MONITORING & HEALTH CHECKS
 # ══════════════════════════════════════════════
+
+health_checker = None
+perf_metrics = None
+
+try:
+    from monitoring import HealthCheck, PerformanceMetrics, capture_exception
+    health_checker = HealthCheck()
+    perf_metrics = PerformanceMetrics()
+    MONITORING_ENABLED = True
+except ImportError:
+    MONITORING_ENABLED = False
+    logger.warning("Monitoring module not available")
+
+# Register health checks
+if MONITORING_ENABLED and health_checker:
+    # Supabase health check
+    def check_supabase() -> tuple[bool, dict]:
+        """Check Supabase connectivity."""
+        if not USE_SUPABASE:
+            return False, {"status": "not_configured"}
+        try:
+            _sb.table("users").select("id").limit(1).execute()
+            return True, {"status": "connected"}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    # Ollama health check
+    def check_ollama() -> tuple[bool, dict]:
+        """Check Ollama connectivity."""
+        try:
+            import requests
+            resp = requests.get("http://localhost:11434/api/tags", timeout=2)
+            return resp.status_code == 200, {"status": "connected"}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    # ChromaDB health check
+    def check_chromadb() -> tuple[bool, dict]:
+        """Check ChromaDB availability."""
+        try:
+            import chromadb
+            db = chromadb.PersistentClient(path="model/chroma_db")
+            collections = db.list_collections()
+            return True, {"status": "connected", "collections": len(collections)}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    health_checker.register("supabase", check_supabase, critical=True)
+    health_checker.register("ollama", check_ollama, critical=True)
+    health_checker.register("chromadb", check_chromadb, critical=False)
+
+@app.get("/health", tags=["monitoring"])
+async def health_check_endpoint():
+    """System health check endpoint.
+    
+    Returns comprehensive health status of all critical services.
+    Used by load balancers and monitoring systems.
+    """
+    if MONITORING_ENABLED and health_checker:
+        status = await health_checker.run_all()
+        status_code = 200 if status["healthy"] else 503
+        return JSONResponse(status, status_code=status_code)
+    return JSONResponse({
+        "healthy": True,
+        "services": {"basic": {"healthy": True}},
+    }, status_code=200)
+
+@app.get("/metrics", tags=["monitoring"])
+def metrics_endpoint():
+    """Performance metrics endpoint.
+    
+    Returns API performance statistics (requests, response times, error rates).
+    """
+    if MONITORING_ENABLED and perf_metrics:
+        return JSONResponse(perf_metrics.get_summary())
+    return JSONResponse({"message": "Metrics not available"})
 
 def _make_token(username: str, user_id: Optional[str] = None) -> str:
     """Create JWT token for user."""
