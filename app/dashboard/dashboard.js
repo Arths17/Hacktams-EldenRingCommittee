@@ -27,7 +27,11 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState({});
 
   useEffect(() => {
-    fetch("/api/me", { credentials: "include" })
+    const token = localStorage.getItem("token");
+    if (!token) { router.push("/login"); return; }
+    fetch("/api/me", {
+      headers: { "Authorization": `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then((data) => {
         if (!data.success) {

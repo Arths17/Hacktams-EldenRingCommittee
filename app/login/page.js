@@ -30,9 +30,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
+        localStorage.setItem("token", data.token);
         setMessage({ text: "✓ Login successful! Redirecting...", type: "success" });
-        window.location.href="/app/dashboard/dashboard.js";
-        setTimeout(() => router.push("/dashboard"), 1500);
+        setTimeout(() => router.push("/dashboard"), 1000);
       } else {
         setMessage({ text: "✗ Invalid username or password. Please try again.", type: "error" });
       }
