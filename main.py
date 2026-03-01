@@ -1376,6 +1376,149 @@ async def get_meals(request: Request, date: Optional[str] = None):
         )
 
 # ══════════════════════════════════════════════
+# FOOD / NUTRITION DATABASE
+# ══════════════════════════════════════════════
+
+_FOOD_DB: list | None = None
+_FOOD_INDEX: dict = {}
+
+_NUTRIENT_MAP = {
+    "Energy":                           ("calories",       "kcal"),
+    "Protein":                          ("protein_g",      "g"),
+    "Total lipid (fat)":                ("fat_g",          "g"),
+    "Carbohydrate, by difference":      ("carbs_g",        "g"),
+    "Fiber, total dietary":             ("fiber_g",        "g"),
+    "Sugars, total including NLEA":     ("sugar_g",        "g"),
+    "Sodium, Na":                       ("sodium_mg",      "mg"),
+    "Cholesterol":                      ("cholesterol_mg", "mg"),
+    "Calcium, Ca":                      ("calcium_mg",     "mg"),
+    "Iron, Fe":                         ("iron_mg",        "mg"),
+    "Potassium, K":                     ("potassium_mg",   "mg"),
+    "Vitamin C, total ascorbic acid":   ("vitamin_c_mg",   "mg"),
+    "Vitamin D (D2 + D3)":             ("vitamin_d_mcg",  "µg"),
+    "Vitamin A, RAE":                   ("vitamin_a_mcg",  "µg"),
+    "Fatty acids, total saturated":     ("sat_fat_g",      "g"),
+    "Fatty acids, total trans":         ("trans_fat_g",    "g"),
+    "Zinc, Zn":                         ("zinc_mg",        "mg"),
+}
+
+def _extract_nutrients(food_nutrients: list) -> dict:
+    result = {}
+    for n in food_nutrients:
+        name = n.get("nutrient", {}).get("name", "")
+        if name in _NUTRIENT_MAP:
+            field, _ = _NUTRIENT_MAP[name]
+            # For Energy prefer kcal over kJ
+            if name == "Energy" and n.get("nutrient", {}).get("unitName", "") == "kJ":
+                continue
+            val = n.get("amount")
+            if val is not None and field not in result:
+                result[field] = round(float(val), 1)
+    return result
+
+def _load_food_db() -> list:
+    global _FOOD_DB, _FOOD_INDEX
+    if _FOOD_DB is not None:
+        return _FOOD_DB
+    base = os.path.dirname(os.path.abspath(__file__))
+    foods = []
+    sources = [
+        ("FoodData_Central_foundation_food_json_2025-12-18.json", "FoundationFoods", "Foundation"),
+        ("surveyDownload.json", "SurveyFoods", "Survey"),
+    ]
+    for filename, key, source_label in sources:
+        path = os.path.join(base, filename)
+        if not os.path.exists(path):
+            logger.warning(f"Food DB not found: {path}")
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            raw = data.get(key, [])
+            for item in raw:
+                nutrients = _extract_nutrients(item.get("foodNutrients", []))
+                cat = (
+                    (item.get("foodCategory") or {}).get("description")
+                    or (item.get("wweiaFoodCategory") or {}).get("wweiaFoodCategoryDescription")
+                    or ""
+                )
+                portions = item.get("foodPortions", [])
+                serving = None
+                if portions:
+                    p = portions[0]
+                    gw = p.get("gramWeight")
+                    unit = (p.get("measureUnit") or {}).get("abbreviation") or p.get("modifier", "")
+                    amt = p.get("amount", 1)
+                    if gw:
+                        serving = {"amount": amt, "unit": unit or "serving", "grams": gw}
+                food = {
+                    "fdc_id": str(item.get("fdcId", "")),
+                    "name": item.get("description", ""),
+                    "category": cat,
+                    "source": source_label,
+                    "serving": serving,
+                    "_key": item.get("description", "").lower(),
+                    **nutrients,
+                }
+                foods.append(food)
+                _FOOD_INDEX[food["fdc_id"]] = food
+            logger.info(f"Loaded {len(raw)} {source_label} foods")
+        except Exception as exc:
+            logger.error(f"Error loading {filename}: {exc}")
+    _FOOD_DB = foods
+    logger.info(f"Food DB ready: {len(_FOOD_DB)} total items")
+    return _FOOD_DB
+
+
+@app.get("/api/nutrition/search")
+async def nutrition_search(request: Request, q: str = "", limit: int = 20):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+    try:
+        _jwt.decode(token, SECRET, algorithms=["HS256"])
+    except Exception:
+        return JSONResponse({"success": False, "error": "Invalid token"}, status_code=401)
+    q = q.strip()
+    if not q:
+        return JSONResponse({"success": False, "error": "Query required"}, status_code=400)
+    db = _load_food_db()
+    query = q.lower()
+    scored = []
+    for food in db:
+        sk = food["_key"]
+        if query in sk:
+            if sk == query:
+                score = 3
+            elif sk.startswith(query):
+                score = 2
+            else:
+                score = 1
+            scored.append((score, food))
+    scored.sort(key=lambda x: (-x[0], x[1]["name"]))
+    limit = min(limit, 50)
+    out = [{k: v for k, v in f.items() if k != "_key"} for _, f in scored[:limit]]
+    return JSONResponse({"success": True, "results": out, "total": len(scored), "query": q})
+
+
+@app.get("/api/nutrition/food/{fdc_id}")
+async def nutrition_food_detail(fdc_id: str, request: Request):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+    try:
+        _jwt.decode(token, SECRET, algorithms=["HS256"])
+    except Exception:
+        return JSONResponse({"success": False, "error": "Invalid token"}, status_code=401)
+    _load_food_db()
+    food = _FOOD_INDEX.get(str(fdc_id))
+    if not food:
+        return JSONResponse({"success": False, "error": "Food not found"}, status_code=404)
+    out = {k: v for k, v in food.items() if k != "_key"}
+    return JSONResponse({"success": True, "food": out})
+
+
+# ══════════════════════════════════════════════
 # APP STARTUP/SHUTDOWN
 # ══════════════════════════════════════════════
 
@@ -1389,6 +1532,9 @@ async def startup_event():
     logger.info(f"  Supabase: {'Connected' if USE_SUPABASE else 'Unavailable (using local fallback)'}")
     logger.info(f"  Docs: http://localhost:8000/api/docs")
     logger.info("="*60)
+    # Pre-load food DB in background so first search is instant
+    import threading
+    threading.Thread(target=_load_food_db, daemon=True).start()
 
 @app.on_event("shutdown")
 async def shutdown_event():
