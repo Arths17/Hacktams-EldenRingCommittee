@@ -3,33 +3,32 @@
 .layout {
   position: relative;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+  background: var(--cream);
   overflow-x: hidden;
 }
 
 .orb {
   position: fixed;
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.25;
+  filter: blur(72px);
   pointer-events: none;
   z-index: 0;
 }
 
 .orbGreen {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #00d084, transparent);
-  top: -100px;
-  right: -100px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(20,90,50,0.18) 0%, transparent 70%);
+  top: -140px;
+  right: -120px;
 }
 
 .orbGold {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #f4b942, transparent);
-  bottom: -150px;
-  left: -150px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(201,155,76,0.15) 0%, transparent 70%);
+  bottom: -80px;
+  left: -90px;
 }
 
 .main {
@@ -49,17 +48,17 @@
 
 /* Goals Card */
 .goalsCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .goalsTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -75,9 +74,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--cream);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
 }
 
 .goalIcon {
@@ -86,7 +85,7 @@
 
 .goalLabel {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -94,22 +93,22 @@
 .goalValue {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #00d084;
+  color: var(--green);
 }
 
 /* Search Card */
 .searchCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .searchTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -121,38 +120,39 @@
 .searchInput {
   flex: 1;
   padding: 1rem 1.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  color: #fff;
+  color: var(--text-dark);
   font-size: 1rem;
   outline: none;
   transition: all 0.3s ease;
 }
 
 .searchInput:focus {
-  border-color: #00d084;
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--green);
+  background: var(--white);
 }
 
 .searchInput::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
 }
 
 .searchButton {
   padding: 1rem 2rem;
-  background: linear-gradient(135deg, #00d084, #00a86b);
+  background: var(--green);
   border: none;
   border-radius: 12px;
-  color: #fff;
+  color: var(--cream);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .searchButton:hover {
+  background: var(--green-light);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 208, 132, 0.3);
+  box-shadow: 0 8px 20px rgba(20, 90, 50, 0.3);
 }
 
 .searchButton:disabled {
@@ -163,17 +163,17 @@
 
 /* Results Card */
 .resultsCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .resultsTitle {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -188,16 +188,16 @@
   align-items: center;
   gap: 1.5rem;
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .resultItem:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #00d084;
+  background: var(--white);
+  border-color: var(--green);
   transform: translateY(-2px);
 }
 
@@ -208,13 +208,13 @@
 .resultName {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-dark);
   margin-bottom: 0.25rem;
 }
 
 .resultCategory {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
 }
 
 .resultNutrients {
@@ -224,27 +224,27 @@
 
 .nutrientBadge {
   padding: 0.5rem 1rem;
-  background: rgba(0, 208, 132, 0.1);
-  border: 1px solid rgba(0, 208, 132, 0.3);
+  background: rgba(20, 90, 50, 0.1);
+  border: 1px solid rgba(20, 90, 50, 0.3);
   border-radius: 8px;
-  color: #00d084;
+  color: var(--green);
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .viewButton {
   padding: 0.75rem 1.5rem;
-  background: rgba(0, 208, 132, 0.1);
-  border: 1px solid #00d084;
+  background: var(--green-light);
+  border: 1px solid var(--green);
   border-radius: 8px;
-  color: #00d084;
+  color: var(--cream);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .viewButton:hover {
-  background: rgba(0, 208, 132, 0.2);
+  background: var(--green);
 }
 
 /* Modal */
@@ -254,7 +254,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -263,8 +263,8 @@
 }
 
 .modalContent {
-  background: linear-gradient(135deg, #1a2332 0%, #2a3442 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 2.5rem;
   max-width: 600px;
@@ -272,37 +272,38 @@
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
 }
 
 .modalClose {
   position: absolute;
   top: 1.5rem;
   right: 1.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 8px;
   width: 40px;
   height: 40px;
   font-size: 1.5rem;
-  color: #fff;
+  color: var(--text-dark);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .modalClose:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border);
 }
 
 .modalTitle {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 0.5rem;
 }
 
 .modalCategory {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-bottom: 2rem;
 }
 
@@ -313,7 +314,7 @@
 .detailsSubtitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1rem;
 }
 
@@ -328,35 +329,35 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 
 .nutrientName {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-dark);
 }
 
 .nutrientValue {
   font-size: 1rem;
   font-weight: 600;
-  color: #00d084;
+  color: var(--green);
 }
 
 /* Tips Card */
 .tipsCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .tipsTitle {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -370,7 +371,7 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--cream);
   border-radius: 8px;
 }
 
@@ -380,7 +381,7 @@
 
 .tipText {
   flex: 1;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-dark);
   line-height: 1.6;
 }
 

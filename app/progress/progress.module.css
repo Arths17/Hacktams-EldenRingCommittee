@@ -3,33 +3,32 @@
 .layout {
   position: relative;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+  background: var(--cream);
   overflow-x: hidden;
 }
 
 .orb {
   position: fixed;
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.25;
+  filter: blur(72px);
   pointer-events: none;
   z-index: 0;
 }
 
 .orbGreen {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #00d084, transparent);
-  top: -100px;
-  right: -100px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(20,90,50,0.18) 0%, transparent 70%);
+  top: -140px;
+  right: -120px;
 }
 
 .orbGold {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #f4b942, transparent);
-  bottom: -150px;
-  left: -150px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(201,155,76,0.15) 0%, transparent 70%);
+  bottom: -80px;
+  left: -90px;
 }
 
 .main {
@@ -59,10 +58,10 @@
   align-items: center;
   gap: 1.5rem;
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .statIcon {
@@ -75,14 +74,14 @@
 
 .statLabel {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   margin-bottom: 0.25rem;
 }
 
 .statValue {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
 }
 
 /* Charts Section */
@@ -93,11 +92,11 @@
 }
 
 .chartCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .chartHeader {
@@ -110,7 +109,7 @@
 .chartTitle {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
 }
 
 .timeRangeButtons {
@@ -120,23 +119,24 @@
 
 .timeButton {
   padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .timeButton:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border-color: var(--green);
 }
 
 .timeButton.active {
-  background: linear-gradient(135deg, #00d084, #00a86b);
-  border-color: #00d084;
-  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--cream);
 }
 
 .chart {
@@ -167,7 +167,7 @@
 .bar {
   width: 100%;
   max-width: 40px;
-  background: linear-gradient(180deg, #00d084, #00a86b);
+  background: var(--green);
   border-radius: 6px 6px 0 0;
   transition: all 0.3s ease;
   cursor: pointer;
@@ -179,35 +179,35 @@
 }
 
 .barProtein {
-  background: linear-gradient(180deg, #f4b942, #f09819);
+  background: var(--gold);
 }
 
 .barLabel {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .chartNote {
   margin-top: 1rem;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   text-align: center;
 }
 
 /* Achievements */
 .achievementsCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .achievementsTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -222,16 +222,16 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--cream);
+  border: 1px solid var(--border);
   border-radius: 12px;
   position: relative;
   transition: all 0.3s ease;
 }
 
 .achievement.unlocked {
-  background: rgba(0, 208, 132, 0.05);
-  border-color: rgba(0, 208, 132, 0.2);
+  background: rgba(20, 90, 50, 0.1);
+  border-color: var(--green-light);
 }
 
 .achievement.locked {
@@ -253,13 +253,13 @@
 .achievementTitle {
   font-size: 1rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 0.25rem;
 }
 
 .achievementDesc {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .unlockedBadge {
@@ -268,29 +268,29 @@
   right: 0.75rem;
   width: 24px;
   height: 24px;
-  background: #00d084;
+  background: var(--green);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--cream);
   font-size: 0.875rem;
   font-weight: 600;
 }
 
 /* Timeline */
 .timelineCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .timelineTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 1.5rem;
 }
 
@@ -309,7 +309,7 @@
   top: 8px;
   bottom: 8px;
   width: 2px;
-  background: linear-gradient(180deg, #00d084, #f4b942);
+  background: linear-gradient(180deg, var(--green), var(--gold));
 }
 
 .timelineItem {
@@ -325,49 +325,49 @@
   top: 4px;
   width: 16px;
   height: 16px;
-  background: #00d084;
+  background: var(--green);
   border-radius: 50%;
-  border: 3px solid #1a2332;
+  border: 3px solid var(--cream);
   z-index: 1;
 }
 
 .timelineContent {
   flex: 1;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--cream);
   border-radius: 8px;
 }
 
 .timelineDate {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-bottom: 0.25rem;
 }
 
 .timelineText {
   font-size: 0.875rem;
-  color: #fff;
+  color: var(--text-dark);
 }
 
 /* Engagement */
 .engagementCard {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--card-shadow);
 }
 
 .engagementTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--green);
   margin-bottom: 0.5rem;
 }
 
 .engagementDesc {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   margin-bottom: 1.5rem;
 }
 
@@ -378,14 +378,14 @@
 .meterBar {
   width: 100%;
   height: 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .meterFill {
   height: 100%;
-  background: linear-gradient(90deg, #00d084, #00a86b);
+  background: var(--green);
   border-radius: 6px;
   transition: width 0.5s ease;
 }
@@ -393,7 +393,7 @@
 .meterLabel {
   margin-top: 0.5rem;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -408,7 +408,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--cream);
   border-radius: 8px;
 }
 
@@ -418,7 +418,7 @@
 
 .tipText {
   flex: 1;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-dark);
   font-size: 0.875rem;
 }
 
