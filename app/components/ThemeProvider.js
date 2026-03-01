@@ -17,9 +17,6 @@ export default function ThemeProvider({ children }) {
     if (saved === "dark" || saved === "light") {
       setTheme(saved);
       document.documentElement.setAttribute("data-theme", saved);
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
-      document.documentElement.setAttribute("data-theme", "dark");
     }
   }, []);
 

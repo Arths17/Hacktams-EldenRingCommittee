@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: `
           try {
             var t = localStorage.getItem('cf-theme');
-            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            if (t === 'dark') {
               document.documentElement.setAttribute('data-theme', 'dark');
             }
           } catch(e) {}
