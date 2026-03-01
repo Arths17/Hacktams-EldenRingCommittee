@@ -24,13 +24,13 @@ export default function NutritionPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) { 
       router.push("/login"); 
       return; 
     }
     fetch(`${API_BASE_URL}/api/me`, {
-      headers: { "Authorization": `Bearer ${token}` },
+      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
     })
       .then((r) => r.json())
       .then((data) => {

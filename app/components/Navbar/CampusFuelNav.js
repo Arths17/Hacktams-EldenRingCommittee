@@ -1,6 +1,7 @@
 "use client";
 // app/components/Navbar/CampusFuelNav.js
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import styles from "./CampusFuelNav.module.css";
 
 export default function CampusFuelNav() {
@@ -16,26 +17,26 @@ export default function CampusFuelNav() {
     <header className={styles.navbar}>
       <div className={styles.navbarInner}>
         {/* Left: logo */}
-        <a href="/" className={styles.brand}>
+        <Link href="/" className={styles.brand}>
           <span className={styles.brandMark}>🌿</span>
           <span className={styles.brandText}>CampusFuel</span>
-        </a>
+        </Link>
 
         {/* Center: main links */}
         <nav className={styles.navLinks}>
-          <a href="/dashboard" className={linkClass("/dashboard")}>Dashboard</a>
-          <a href="/ai" className={linkClass("/ai")}>AI Coach</a>
-          <a href="/survey" className={linkClass("/survey")}>Survey</a>
-          <a href="/nutrition" className={linkClass("/nutrition")}>Nutrition</a>
-          <a href="/progress" className={linkClass("/progress")}>Progress</a>
-          <a href="/meals" className={linkClass("/meals")}>Meals</a>
+          <Link href="/dashboard" className={linkClass("/dashboard")}>Dashboard</Link>
+          <Link href="/ai" className={linkClass("/ai")}>AI Coach</Link>
+          <Link href="/survey" className={linkClass("/survey")}>Survey</Link>
+          <Link href="/nutrition" className={linkClass("/nutrition")}>Nutrition</Link>
+          <Link href="/progress" className={linkClass("/progress")}>Progress</Link>
+          <Link href="/meals" className={linkClass("/meals")}>Meals</Link>
         </nav>
 
         {/* Right: actions */}
         <div className={styles.navActions}>
-          <a href="/ai" className={`${styles.btnAi} ${pathname === "/ai" ? styles.btnAiActive : ""}`}>
+          <Link href="/ai" className={`${styles.btnAi} ${pathname === "/ai" ? styles.btnAiActive : ""}`}>
             🤖 AI Coach
-          </a>
+          </Link>
         </div>
       </div>
     </header>

@@ -43,7 +43,7 @@ export default function ProgressPage() {
   ];
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) { 
       router.push("/login"); 
       return; 
@@ -51,7 +51,7 @@ export default function ProgressPage() {
     
     // Fetch user profile
     fetch(`${API_BASE_URL}/api/me`, {
-      headers: { "Authorization": `Bearer ${token}` },
+      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
     })
       .then((r) => r.json())
       .then((data) => {
