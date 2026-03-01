@@ -16,22 +16,54 @@ export default function AIPage() {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Check for profile on mount
+  // Auto-resize textarea
   useEffect(() => {
-    const saved = localStorage.getItem("campusfuel_profile");
-    if (saved) {
-      try {
-        const p = JSON.parse(saved);
-        setProfileName(p.name || "");
-        setProfileReady(true);
-      } catch {
-        setProfileReady(false);
-      }
-    } else {
-      setProfileReady(false);
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     }
-    setCheckingProfile(false);
-  }, []);
+  }, [input]);
+
+  // Check for profile on mount - fetch from backend based on logged-in user
+  useEffect(() => {
+    async function loadProfile() {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          router.push("/login");
+          return;
+        }
+
+        // Check if user has a profile
+        if (data.profile && Object.keys(data.profile).length > 0) {
+          setProfileName(data.profile.name || data.username || "");
+          setProfileReady(true);
+          // Update localStorage as cache
+          localStorage.setItem("campusfuel_profile", JSON.stringify(data.profile));
+        } else {
+          setProfileReady(false);
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+        setProfileReady(false);
+      } finally {
+        setCheckingProfile(false);
+      }
+    }
+
+    loadProfile();
+  }, [router]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -214,23 +246,24 @@ export default function AIPage() {
 
         {/* Input area */}
         <div className={styles.inputArea}>
-          <textarea
-            ref={inputRef}
-            className={styles.chatInput}
-            placeholder="Ask your AI health coach anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={2}
-            disabled={loading}
-          />
-          <button
-            className={styles.sendBtn}
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-          >
-            {loading ? "..." : "Send"}
-          </button>
+          <div className={styles.inputContainer}>
+            <textarea
+              ref={inputRef}
+              className={styles.chatInput}
+              placeholder="Ask your AI health coach anything..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+            />
+            <button
+              className={styles.sendBtn}
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+            >
+              {loading ? "..." : "Send"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

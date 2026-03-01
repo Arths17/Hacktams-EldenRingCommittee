@@ -1,0 +1,620 @@
+/* app/landing.module.css */
+
+/* ── Keyframes ───────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.7); }
+  70%  { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* ── Ambient: particle drift ─────────────────────────── */
+@keyframes driftUp {
+  0%   { transform: translateY(0) rotate(0deg) scale(1);   opacity: 0; }
+  8%   { opacity: 0.55; }
+  92%  { opacity: 0.55; }
+  100% { transform: translateY(-110vh) rotate(320deg) scale(0.7); opacity: 0; }
+}
+
+/* ── Ambient: orb float ──────────────────────────────── */
+@keyframes orbFloat {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%     { transform: translate(40px, -30px) scale(1.06); }
+  66%     { transform: translate(-25px, 20px) scale(0.96); }
+}
+
+/* ── Ambient: ticker scroll ──────────────────────────── */
+@keyframes scrollTicker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ── Ambient: CTA pulse glow ─────────────────────────── */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 4px 20px rgba(20,90,50,0.25); }
+  50%       { box-shadow: 0 8px 36px rgba(20,90,50,0.55), 0 0 0 6px rgba(20,90,50,0.1); }
+}
+
+/* ── Scroll-reveal (driven by JS IntersectionObserver) ─ */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.delay1 { transition-delay: 0.1s; }
+.delay2 { transition-delay: 0.2s; }
+.delay3 { transition-delay: 0.3s; }
+.delay4 { transition-delay: 0.4s; }
+.delay5 { transition-delay: 0.5s; }
+
+/* ── Top Nav ─────────────────────────────────────────── */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+  height: 64px;
+  background: rgba(248, 243, 231, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(20, 90, 50, 0.1);
+  animation: fadeDown 0.6s ease both;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.brandIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--green);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.brandName {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: -0.3px;
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btnOutline {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1.5px solid var(--green);
+  background: transparent;
+  color: var(--green);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.btnOutline:hover {
+  background: var(--green);
+  color: #fff;
+}
+
+.btnFill {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  background: var(--green);
+  color: #fff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+
+.btnFill:hover {
+  background: var(--green-light);
+}
+
+/* ── Orbs ─────────────────────────────────────────────── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  pointer-events: none;
+  animation: orbFloat ease-in-out infinite;
+  z-index: 0;
+}
+
+.orbGreen {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(20,90,50,0.28) 0%, transparent 70%);
+  top: -140px;
+  right: -120px;
+  animation-duration: 14s;
+}
+
+.orbGold {
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(201,155,76,0.22) 0%, transparent 70%);
+  bottom: -80px;
+  left: -90px;
+  animation-duration: 18s;
+  animation-delay: -7s;
+}
+
+/* ── Particles ─────────────────────────────────────────── */
+.particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  bottom: -8%;
+  user-select: none;
+  line-height: 1;
+  animation: driftUp linear infinite;
+  will-change: transform, opacity;
+}
+
+/* ── Ticker strip ──────────────────────────────────────── */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--green-dark, #0e3e23);
+  padding: 14px 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.tickerTrack {
+  display: inline-flex;
+  animation: scrollTicker 32s linear infinite;
+}
+
+.tickerTrack:hover {
+  animation-play-state: paused;
+}
+
+.tickerItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.78);
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+.tickerDot {
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  padding: 100px 2rem 4rem;
+  text-align: center;
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+.heroTag {
+  display: inline-block;
+  background: rgba(20, 90, 50, 0.1);
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin-bottom: 1.5rem;
+  animation: fadeUp 0.7s ease 0.1s both;
+}
+
+.heroTitle {
+  font-size: clamp(2.5rem, 6vw, 4.2rem);
+  font-weight: 800;
+  color: var(--green-dark, #0e3e23);
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin-bottom: 1.25rem;
+  animation: fadeUp 0.7s ease 0.25s both;
+}
+
+.heroTitle span {
+  color: var(--gold);
+}
+
+.heroSub {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 560px;
+  margin: 0 auto 2.5rem;
+  animation: fadeUp 0.7s ease 0.4s both;
+}
+
+.heroCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  animation: fadeUp 0.7s ease 0.55s both;
+}
+
+.btnHero {
+  height: 50px;
+  padding: 0 32px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  background: var(--green);
+  color: #fff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.btnHero:hover {
+  background: var(--green-light);
+  box-shadow: 0 6px 24px rgba(20, 90, 50, 0.35);
+}
+
+.btnHeroAlt {
+  height: 50px;
+  padding: 0 32px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 2px solid var(--gold);
+  background: transparent;
+  color: var(--gold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.btnHeroAlt:hover {
+  background: var(--gold);
+  color: #fff;
+}
+
+/* ── Stats bar ────────────────────────────────────────── */
+.statsBar {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  background: var(--green);
+  padding: 0;
+}
+
+.stat {
+  flex: 1;
+  max-width: 240px;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  border-right: 1px solid rgba(255,255,255,0.12);
+}
+
+.stat:last-child {
+  border-right: none;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+/* ── Features ─────────────────────────────────────────── */
+.features {
+  padding: 6rem 2rem;
+  background: #fff;
+}
+
+.sectionHead {
+  text-align: center;
+  margin-bottom: 3.5rem;
+}
+
+.sectionTag {
+  display: inline-block;
+  background: rgba(201,155,76,0.12);
+  color: var(--gold-dark, #a67c35);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+  font-weight: 800;
+  color: var(--green-dark, #0e3e23);
+  letter-spacing: -0.8px;
+  margin-bottom: 0.75rem;
+}
+
+.sectionSub {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.featureCard {
+  background: var(--cream);
+  border-radius: 16px;
+  padding: 2rem;
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s, transform 0.2s, opacity 0.6s ease;
+}
+
+.featureCard:hover {
+  box-shadow: 0 8px 32px rgba(20,90,50,0.1);
+  transform: translateY(-5px);
+}
+
+.featureIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 1.25rem;
+  transition: transform 0.3s ease;
+}
+
+.featureCard:hover .featureIcon {
+  animation: float 2s ease-in-out infinite;
+}
+
+.featureIcon.gold {
+  background: var(--gold);
+}
+
+.featureTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--green-dark, #0e3e23);
+  margin-bottom: 0.5rem;
+}
+
+.featureDesc {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── How it works ─────────────────────────────────────── */
+.howItWorks {
+  padding: 6rem 2rem;
+  background: var(--cream);
+}
+
+.steps {
+  display: flex;
+  gap: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.step {
+  flex: 1;
+  min-width: 200px;
+  max-width: 280px;
+  text-align: center;
+}
+
+.stepNum {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.step:hover .stepNum {
+  transform: scale(1.12);
+  box-shadow: 0 6px 20px rgba(20, 90, 50, 0.3);
+}
+
+.stepTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--green-dark, #0e3e23);
+  margin-bottom: 0.5rem;
+}
+
+.stepDesc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── CTA Banner ───────────────────────────────────────── */
+.ctaBanner {
+  padding: 6rem 2rem;
+  background: var(--green);
+  text-align: center;
+}
+
+.ctaTitle {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.8px;
+  margin-bottom: 1rem;
+}
+
+.ctaSub {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.75);
+  max-width: 480px;
+  margin: 0 auto 2rem;
+  line-height: 1.6;
+}
+
+.btnCtaWhite {
+  height: 50px;
+  padding: 0 36px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  background: #fff;
+  color: var(--green);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.btnCtaWhite:hover {
+  opacity: 0.92;
+  box-shadow: 0 6px 28px rgba(0,0,0,0.2);
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+.footer {
+  padding: 2rem 2.5rem;
+  background: var(--green-dark, #0e3e23);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footerBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.footerCopy {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+}
+

@@ -34,6 +34,7 @@ export default function SignupPage() {
       const formData = new FormData();
       formData.append("username", username);
       formData.append("password", password);
+      formData.append("password_confirm", confirmPassword);
 
       const response = await fetch("/api/signup", {
         method: "POST",
@@ -45,6 +46,8 @@ export default function SignupPage() {
 
       if (data.success) {
         localStorage.setItem("token", data.token);
+        // Clear old profile cache from previous accounts
+        localStorage.removeItem("campusfuel_profile");
         setMessage({ text: "✓ Account created! Redirecting to dashboard...", type: "success" });
         setTimeout(() => router.push("/dashboard"), 1000);
       } else {

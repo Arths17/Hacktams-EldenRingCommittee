@@ -31,6 +31,8 @@ export default function LoginPage() {
 
       if (data.success) {
         localStorage.setItem("token", data.token);
+        // Clear old profile cache to prevent account mix-ups
+        localStorage.removeItem("campusfuel_profile");
         setMessage({ text: "✓ Login successful! Redirecting...", type: "success" });
         setTimeout(() => router.push("/dashboard"), 1000);
       } else {
