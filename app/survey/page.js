@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./survey.module.css";
 
 const STEPS = [
@@ -281,7 +282,7 @@ export default function SurveyPage() {
       
       {/* Header */}
       <div className={styles.topBar}>
-        <span className={styles.brand}>🌿 CampusFuel</span>
+        <Link href="/dashboard" className={styles.brand}>🌿 CampusFuel</Link>
         <span className={styles.stepCount}>{step + 1} / {STEPS.length}</span>
       </div>
 
