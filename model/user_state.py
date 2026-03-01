@@ -738,7 +738,8 @@ FEEDBACK_PROTOCOL_MAP: dict[str, list[str]] = {
 # Regex patterns for feedback extraction
 _EXPLICIT_PATTERN   = re.compile(
     r"\b(energy|focus|sleep|stress|mood|gut|muscle|immune|anxiety|hunger|bloat|headache|cramp)"
-    r"\s*[:\-]?\s*([+-]?\d+(?:\.\d+)?)"
+    r"(?:\s*[:=]?\s*|\s+)"  # separator or whitespace
+    r"([+\-]?\d+(?:\.\d+)?)"  # number with optional sign
 )
 _IMPROVED_PATTERN   = re.compile(
     r"\b(?:my\s+)?(energy|focus|sleep|mood|gut|stress)\s+(?:is\s+)?(improved|better|great|good|up)\b"
@@ -747,7 +748,8 @@ _WORSENED_PATTERN   = re.compile(
     r"\b(?:my\s+)?(energy|focus|sleep|mood|gut|stress)\s+(?:is\s+)?(worse|bad|terrible|down|lower)\b"
 )
 _POS_ADJ_PATTERN    = re.compile(r"\b(?:more|better)\s+(energetic|focused|rested|calm|happy)\b")
-_NEG_ADJ_PATTERN    = re.compile(r"\b(?:less|worse|more)\s+(tired|stressed|anxious|bloated)\b")
+_NEG_ADJ_PATTERN    = re.compile(r"\b(less|more)\s+(tired|stressed|anxious|bloated)\b")
+_STANDALONE_NEG_PATTERN = re.compile(r"\b(?:feeling\s+)?(anxious|bloated|tired|stressed)\b")
 
 _ADJ_SIGNAL: dict[str, str] = {
     "energetic": "energy", "focused": "focus", "rested": "sleep",
@@ -765,6 +767,7 @@ def parse_feedback_from_text(text: str) -> dict[str, float]:
     "energy +2, focus +1, sleep -1"  → {"energy": 2.0, "focus": 1.0, "sleep": -1.0}
     "I feel more energetic today"    → {"energy": 1.0}
     "my stress is worse"             → {"stress": -1.0}
+    "less tired" or "feeling anxious" → {"energy": 1.0}, {"anxiety": -1.0}
     """
     signals: dict[str, float] = {}
     tl = text.lower()
@@ -794,9 +797,20 @@ def parse_feedback_from_text(text: str) -> dict[str, float]:
         if key and key not in signals:
             signals[key] = 1.0
 
-    # Pattern 5: "more tired / stressed / ..."
+    # Pattern 5: "more/less tired / stressed / ..." (context-aware)
     for m in _NEG_ADJ_PATTERN.finditer(tl):
-        key = _ADJ_SIGNAL.get(m.group(1))
+        adj = m.group(2)
+        prefix = m.group(1).lower()
+        key = _ADJ_SIGNAL.get(adj)
+        if key and key not in signals:
+            # "less" + negative adj = positive improvement
+            # "more" + negative adj = negative decline
+            signals[key] = 1.0 if prefix == "less" else -1.0
+
+    # Pattern 6: standalone adjectives (e.g., "feeling anxious")
+    for m in _STANDALONE_NEG_PATTERN.finditer(tl):
+        adj = m.group(1)
+        key = _ADJ_SIGNAL.get(adj)
         if key and key not in signals:
             signals[key] = -1.0
 
