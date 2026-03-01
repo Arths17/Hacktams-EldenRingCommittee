@@ -3,9 +3,11 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import styles from "./CampusFuelNav.module.css";
+import { useTheme } from "../ThemeProvider";
 
 export default function CampusFuelNav() {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
 
   function linkClass(href) {
     return pathname === href
@@ -34,6 +36,14 @@ export default function CampusFuelNav() {
 
         {/* Right: actions */}
         <div className={styles.navActions}>
+          <button
+            className={styles.themeToggle}
+            onClick={toggle}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Light mode" : "Dark mode"}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
           <Link href="/ai" className={`${styles.btnAi} ${pathname === "/ai" ? styles.btnAiActive : ""}`}>
             🤖 AI Coach
           </Link>
