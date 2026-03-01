@@ -210,17 +210,14 @@ async def chat(request: Request):
     def generate():
         try:
             import ollama
-            import nutrition_db
-            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context, analyze_profile
+            from model import MODEL_NAME, build_full_context
 
-            nutrition_db.load()
-            analysis      = analyze_profile(profile)
-            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
-            research_ctx  = load_research_context()
-            system_full   = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile, analysis) + nutrition_ctx
+            system_full, seed_message = build_full_context(profile, username)
 
             messages = [
                 {"role": "system", "content": system_full},
+                {"role": "user",   "content": seed_message},
+                {"role": "assistant", "content": "Understood. I have your full profile, state analysis, protocol priorities, and nutrition data loaded."},
                 {"role": "user",   "content": message},
             ]
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
@@ -233,3 +230,4 @@ async def chat(request: Request):
             yield f"[Error: {e}]"
 
     return StreamingResponse(generate(), media_type="text/plain")
+
