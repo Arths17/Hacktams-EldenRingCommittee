@@ -51,6 +51,21 @@ export default function ProgressPage() {
     Math.round((activityMetrics.loggedDays || 0) * 4 + (activityMetrics.currentStreak || 0) * 8)
   );
 
+  const handleSaveWorkout = async () => {
+    if (!newWorkout.type || !newWorkout.duration) return;
+    setWorkoutSaving(true);
+    const result = await addWorkout({
+      ...newWorkout,
+      duration: parseInt(newWorkout.duration) || 0,
+      timestamp: new Date().toISOString(),
+    });
+    setWorkoutSaving(false);
+    if (result?.success !== false) {
+      setShowWorkoutModal(false);
+      setNewWorkout({ type: "Strength Training", duration: "", notes: "", date: new Date().toISOString().split("T")[0] });
+    }
+  };
+
   return (
     <div className={styles.layout}>
       <div className={`${styles.orb} ${styles.orbGreen}`} />
@@ -60,6 +75,13 @@ export default function ProgressPage() {
       <div className={styles.main}>
         <Header title="Progress & Analytics" username={user?.username || ""} />
         <div className={styles.content}>
+
+          {/* Log Workout button */}
+          <div className={styles.workoutActionRow}>
+            <button className={styles.logWorkoutBtn} onClick={() => setShowWorkoutModal(true)}>
+              + Log Workout
+            </button>
+          </div>
 
           {/* Summary Stats */}
           <div className={styles.summaryGrid}>
@@ -256,8 +278,102 @@ export default function ProgressPage() {
             </div>
           </div>
 
+          {/* Workout Log */}
+          <div className={styles.workoutCard}>
+            <h2 className={styles.workoutCardTitle}>🏋️ Workout Log</h2>
+            {workouts.length === 0 ? (
+              <p className={styles.workoutEmpty}>No workouts logged yet. Hit &quot;Log Workout&quot; to get started!</p>
+            ) : (
+              <div className={styles.workoutList}>
+                {workouts.slice(0, 10).map((w, i) => (
+                  <div key={w.id || i} className={styles.workoutRow}>
+                    <div className={styles.workoutRowLeft}>
+                      <span className={styles.workoutType}>{w.type}</span>
+                      {w.notes && <span className={styles.workoutNotes}>{w.notes}</span>}
+                    </div>
+                    <div className={styles.workoutRowRight}>
+                      <span className={styles.workoutDuration}>⏱ {w.duration} min</span>
+                      <span className={styles.workoutDate}>{w.date}</span>
+                      <button
+                        className={styles.workoutDeleteBtn}
+                        onClick={() => deleteWorkout(w.id)}
+                        title="Delete"
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
+
+      {/* Log Workout Modal */}
+      {showWorkoutModal && (
+        <div className={styles.modal} onClick={(e) => e.target === e.currentTarget && setShowWorkoutModal(false)}>
+          <div className={styles.modalContent}>
+            <button className={styles.modalClose} onClick={() => setShowWorkoutModal(false)}>×</button>
+            <h2 className={styles.modalTitle}>🏋️ Log Workout</h2>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Workout Type</label>
+              <select
+                className={styles.formSelect}
+                value={newWorkout.type}
+                onChange={(e) => setNewWorkout({ ...newWorkout, type: e.target.value })}
+              >
+                {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Duration (minutes)</label>
+              <input
+                type="number"
+                min="1"
+                max="300"
+                className={styles.formInput}
+                placeholder="e.g. 45"
+                value={newWorkout.duration}
+                onChange={(e) => setNewWorkout({ ...newWorkout, duration: e.target.value })}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Date</label>
+              <input
+                type="date"
+                className={styles.formInput}
+                value={newWorkout.date}
+                onChange={(e) => setNewWorkout({ ...newWorkout, date: e.target.value })}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Notes (optional)</label>
+              <input
+                type="text"
+                className={styles.formInput}
+                placeholder="e.g. felt strong today, new PR on bench"
+                value={newWorkout.notes}
+                onChange={(e) => setNewWorkout({ ...newWorkout, notes: e.target.value })}
+              />
+            </div>
+
+            <div className={styles.modalActions}>
+              <button className={styles.cancelButton} onClick={() => setShowWorkoutModal(false)}>Cancel</button>
+              <button
+                className={styles.saveButton}
+                onClick={handleSaveWorkout}
+                disabled={!newWorkout.type || !newWorkout.duration || workoutSaving}
+              >
+                {workoutSaving ? "Saving..." : "Save Workout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
