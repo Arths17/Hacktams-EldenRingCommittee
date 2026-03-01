@@ -190,6 +190,7 @@ def performance_middleware(metrics: PerformanceMetrics):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             start = time.time()
+            success = False  # Initialize to prevent "possibly unbound" error
             try:
                 result = await func(*args, **kwargs)
                 success = True
@@ -215,9 +216,13 @@ def capture_exception(exc: Exception, context: Optional[Dict[str, Any]] = None):
         context: Additional context dictionary
     """
     if SENTRY_ENABLED:
-        if context:
-            sentry_sdk.set_context("custom", context)
-        sentry_sdk.capture_exception(exc)
+        try:
+            import sentry_sdk as sentry
+            if context:
+                sentry.set_context("custom", context)
+            sentry.capture_exception(exc)
+        except ImportError:
+            pass
     
     logger.error(f"Exception captured: {exc}", exc_info=True)
 
@@ -231,9 +236,15 @@ def capture_message(message: str, level: str = "info", context: Optional[Dict[st
         context: Additional context dictionary
     """
     if SENTRY_ENABLED:
-        if context:
-            sentry_sdk.set_context("custom", context)
-        sentry_sdk.capture_message(message, level=level)
+        try:
+            import sentry_sdk as sentry
+            if context:
+                sentry.set_context("custom", context)
+            # Cast level to valid Sentry type
+            valid_level = level if level in ["debug", "info", "warning", "error", "fatal"] else "info"  # type: ignore
+            sentry.capture_message(message, level=valid_level)  # type: ignore
+        except ImportError:
+            pass
     
     getattr(logger, level)(message)
 

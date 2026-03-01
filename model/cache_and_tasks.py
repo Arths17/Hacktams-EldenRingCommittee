@@ -52,8 +52,8 @@ class RedisCache:
             return None
         
         try:
-            value = redis_client.get(key)  # type: ignore
-            if value:
+            value: Optional[str] = redis_client.get(key)  # type: ignore
+            if value and isinstance(value, str):
                 return json.loads(value)
             return None
         except Exception as e:
@@ -146,6 +146,16 @@ def cache_decorator(ttl: int = 3600, key_prefix: str = ""):
 
 # Celery Configuration (optional, graceful fallback)
 CELERY_ENABLED = False
+
+# Define fallback celery_app first
+class _FallbackCeleryApp:
+    """Fallback Celery app when Celery is not available."""
+    def task(self, *args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
+celery_app: Any = _FallbackCeleryApp()  # type: ignore
 
 try:
     from celery import Celery

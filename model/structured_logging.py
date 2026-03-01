@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import Dict, Any, Optional
 from datetime import datetime
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter
 
 
 class StructuredLogger:
@@ -147,7 +147,7 @@ def setup_json_logging(log_file: Optional[str] = None):
     root_logger.setLevel(logging.DEBUG)
     
     # JSON formatter
-    json_formatter = jsonlogger.JsonFormatter()
+    json_formatter = JsonFormatter()
     
     # Console handler
     console_handler = logging.StreamHandler()
