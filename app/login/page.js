@@ -15,6 +15,7 @@ const particles = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(null); // { text, type: "success" | "error" }
@@ -27,7 +28,6 @@ export default function LoginPage() {
     if (!token) return;
 
     let cancelled = false;
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     async function validateTokenAndRedirect() {
       try {
@@ -68,7 +68,7 @@ export default function LoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch("/api/login", {
+      const response = await fetch(`${apiBase}/login`, {
         method: "POST",
         credentials: "include",
         headers: { "ngrok-skip-browser-warning": "true" },
@@ -92,7 +92,10 @@ export default function LoginPage() {
         setMessage({ text: "✗ Invalid username or password. Please try again.", type: "error" });
       }
     } catch {
-      setMessage({ text: "✗ Could not reach the server. Please try again.", type: "error" });
+      const localHint = apiBase.includes("localhost")
+        ? " Backend may be offline — run: npm run backend"
+        : "";
+      setMessage({ text: `✗ Could not reach the server. Please try again.${localHint}`, type: "error" });
     } finally {
       setLoading(false);
     }
