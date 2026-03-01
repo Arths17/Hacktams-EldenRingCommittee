@@ -1,7 +1,9 @@
 """
 HealthOS — Nutrition Data Training Pipeline
-Downloads the Kaggle nutritional values dataset and builds a local
-nutrition_index.json used by the AI model at runtime.
+Downloads multiple Kaggle datasets and builds:
+  • model/nutrition_index.json   — merged food database (60k+ foods)
+  • model/sleep_insights.json    — sleep/stress statistics
+  • model/student_health.json    — college student mental health stats
 
 Run once:  .venv/bin/python train.py
 """
@@ -14,7 +16,12 @@ import pathlib
 import kagglehub
 import pandas as pd
 
-OUTPUT_FILE = "model/nutrition_index.json"
+OUTPUT_FILE          = "model/nutrition_index.json"
+SLEEP_INSIGHTS_FILE  = "model/sleep_insights.json"
+STUDENT_HEALTH_FILE  = "model/student_health.json"
+
+# Max new foods to import from Open Food Facts (quality-filtered)
+MAX_OFF_FOODS = 25_000
 
 # ─────────────────────────────────────────────
 # COLUMN NORMALISATION MAP
@@ -168,16 +175,262 @@ def auto_tag(row: dict) -> list:
 
 
 # ─────────────────────────────────────────────
+# DATASET 2 — OPEN FOOD FACTS
+# openfoodfacts/world-food-facts
+# 300k+ branded/global foods, all values per 100g
+# Minerals stored as g/100g → must convert to mg/mg/µg
+# Energy stored as kJ → must convert to kcal
+# ─────────────────────────────────────────────
+OFF_COLS = [
+    "product_name", "serving_size",
+    "energy_100g", "proteins_100g", "fat_100g", "carbohydrates_100g",
+    "fiber_100g", "sugars_100g", "sodium_100g", "calcium_100g",
+    "iron_100g", "potassium_100g", "vitamin-c_100g", "vitamin-b12_100g",
+    "magnesium_100g", "zinc_100g",
+]
+
+def _load_openfoodfacts() -> dict:
+    """Download Open Food Facts and return a food index dict."""
+    print("\n📥  Downloading Open Food Facts (global branded foods)…")
+    path = kagglehub.dataset_download("openfoodfacts/world-food-facts")
+    tsv_files = glob.glob(os.path.join(path, "**", "*.tsv"), recursive=True)
+    if not tsv_files:
+        print("⚠️  No TSV found — skipping Open Food Facts")
+        return {}
+
+    index: dict = {}
+    total = 0
+
+    for chunk in pd.read_csv(
+        tsv_files[0], sep="\t",
+        usecols=lambda c: c in OFF_COLS,
+        chunksize=50_000, low_memory=False, on_bad_lines="skip",
+    ):
+        if total >= MAX_OFF_FOODS:
+            break
+        chunk = chunk.dropna(subset=["product_name", "energy_100g"])
+        chunk = chunk[chunk["product_name"].astype(str).str.strip() != ""]
+
+        for _, row in chunk.iterrows():
+            if total >= MAX_OFF_FOODS:
+                break
+            name = str(row["product_name"]).strip()
+            if not name or name.lower() in index:
+                continue
+
+            # kJ → kcal
+            try:
+                calories = round(float(row["energy_100g"]) / 4.184, 1)
+            except (ValueError, TypeError):
+                continue
+            if not (5 <= calories <= 900):
+                continue
+
+            record: dict = {"name": name, "calories": calories}
+
+            # Macros (g/100g — no unit change)
+            for src, dst in [
+                ("proteins_100g",     "protein_g"),
+                ("fat_100g",          "fat_g"),
+                ("carbohydrates_100g","carbs_g"),
+                ("fiber_100g",        "fiber_g"),
+                ("sugars_100g",       "sugar_g"),
+            ]:
+                try:
+                    v = float(row.get(src) or 0)
+                    if v > 0:
+                        record[dst] = round(v, 2)
+                except (ValueError, TypeError):
+                    pass
+
+            # Minerals: g/100g → mg/100g (×1000)
+            for src, dst in [
+                ("sodium_100g",     "sodium_mg"),
+                ("calcium_100g",    "calcium_mg"),
+                ("iron_100g",       "iron_mg"),
+                ("potassium_100g",  "potassium_mg"),
+                ("vitamin-c_100g",  "vitamin_c_mg"),
+                ("magnesium_100g",  "magnesium_mg"),
+                ("zinc_100g",       "zinc_mg"),
+            ]:
+                try:
+                    v = float(row.get(src) or 0)
+                    if v > 0:
+                        record[dst] = round(v * 1000, 2)
+                except (ValueError, TypeError):
+                    pass
+
+            # Vitamin B12: g/100g → µg/100g (×1,000,000)
+            try:
+                b12 = float(row.get("vitamin-b12_100g") or 0)
+                if b12 > 0:
+                    record["vitamin_b12_ug"] = round(b12 * 1_000_000, 2)
+            except (ValueError, TypeError):
+                pass
+
+            # Quality filter: must have at least protein or carbs
+            if not record.get("protein_g") and not record.get("carbs_g"):
+                continue
+
+            record["tags"] = auto_tag(record)
+            index[name.lower()] = record
+            total += 1
+
+    print(f"✅  Open Food Facts: {total:,} foods added")
+    return index
+
+
+# ─────────────────────────────────────────────
+# DATASET 3 — SLEEP HEALTH & LIFESTYLE
+# uom190346a/sleep-health-and-lifestyle-dataset
+# 374 adults: sleep hours, quality, stress, activity, BMI
+# ─────────────────────────────────────────────
+def build_sleep_insights() -> None:
+    print("\n📥  Downloading Sleep Health & Lifestyle dataset…")
+    path = kagglehub.dataset_download("uom190346a/sleep-health-and-lifestyle-dataset")
+    csvs = glob.glob(os.path.join(path, "**", "*.csv"), recursive=True)
+    df = pd.read_csv(csvs[0])
+    df.columns = [c.strip() for c in df.columns]
+
+    insights: dict = {}
+
+    # Sleep quality vs duration buckets
+    df["sleep_bucket"] = pd.cut(
+        df["Sleep Duration"], bins=[0, 5, 6, 7, 8, 24],
+        labels=["<5h", "5-6h", "6-7h", "7-8h", ">8h"]
+    )
+    insights["sleep_quality_by_hours"] = (
+        df.groupby("sleep_bucket", observed=True)["Quality of Sleep"]
+        .mean().round(2).to_dict()
+    )
+    insights["stress_by_sleep_hours"] = (
+        df.groupby("sleep_bucket", observed=True)["Stress Level"]
+        .mean().round(2).to_dict()
+    )
+
+    # Physical activity vs sleep quality
+    df["activity_bucket"] = pd.cut(
+        df["Physical Activity Level"], bins=[0, 30, 60, 90, 200],
+        labels=["low(<30min)", "moderate(30-60)", "high(60-90)", "very_high(>90)"]
+    )
+    insights["sleep_quality_by_activity"] = (
+        df.groupby("activity_bucket", observed=True)["Quality of Sleep"]
+        .mean().round(2).to_dict()
+    )
+
+    # BMI vs sleep quality
+    insights["sleep_quality_by_bmi"] = (
+        df.groupby("BMI Category")["Quality of Sleep"].mean().round(2).to_dict()
+    )
+
+    # % high stress (≥7) among people sleeping < 6h
+    low_sleep = df[df["Sleep Duration"] < 6]
+    insights["pct_high_stress_with_low_sleep"] = round(
+        (low_sleep["Stress Level"] >= 7).mean() * 100, 1
+    )
+
+    # Optimal sleep for minimum stress
+    best_sleep = (
+        df.groupby("sleep_bucket", observed=True)["Stress Level"]
+        .mean().idxmin()
+    )
+    insights["optimal_sleep_range_for_stress"] = str(best_sleep)
+
+    # Occupation breakdown
+    insights["sleep_by_occupation"] = (
+        df.groupby("Occupation")["Sleep Duration"].mean().round(1).to_dict()
+    )
+
+    insights["meta"] = {
+        "source": "uom190346a/sleep-health-and-lifestyle-dataset",
+        "records": len(df),
+        "summary": (
+            "374 adults: sleep duration/quality, stress (1-10), "
+            "physical activity, BMI, sleep disorders"
+        ),
+    }
+
+    pathlib.Path(SLEEP_INSIGHTS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    with open(SLEEP_INSIGHTS_FILE, "w") as f:
+        json.dump(insights, f, indent=2)
+    print(f"✅  Sleep insights → {SLEEP_INSIGHTS_FILE}")
+
+
+# ─────────────────────────────────────────────
+# DATASET 4 — STUDENT MENTAL HEALTH
+# shariful07/student-mental-health
+# 101 university students: depression, anxiety, panic attacks
+# ─────────────────────────────────────────────
+def build_student_health_insights() -> None:
+    print("\n📥  Downloading Student Mental Health dataset…")
+    path = kagglehub.dataset_download("shariful07/student-mental-health")
+    csvs = glob.glob(os.path.join(path, "**", "*.csv"), recursive=True)
+    df = pd.read_csv(csvs[0])
+    df.columns = [c.strip() for c in df.columns]
+
+    insights: dict = {}
+
+    yes = lambda col: round((df[col] == "Yes").mean() * 100, 1)
+
+    insights["depression_prevalence_pct"]    = yes("Do you have Depression?")
+    insights["anxiety_prevalence_pct"]       = yes("Do you have Anxiety?")
+    insights["panic_attack_prevalence_pct"]  = yes("Do you have Panic attack?")
+    insights["sought_treatment_pct"]         = yes("Did you seek any specialist for a treatment?")
+
+    # Co-occurrence: both depression AND anxiety
+    both = (
+        (df["Do you have Depression?"] == "Yes") &
+        (df["Do you have Anxiety?"]    == "Yes")
+    )
+    insights["depression_and_anxiety_pct"] = round(both.mean() * 100, 1)
+
+    # Depression by CGPA
+    insights["depression_by_cgpa"] = (
+        df.groupby("What is your CGPA?")["Do you have Depression?"]
+        .apply(lambda x: round((x == "Yes").mean() * 100, 1))
+        .to_dict()
+    )
+
+    # Anxiety by year of study
+    insights["anxiety_by_year"] = (
+        df.groupby("Your current year of Study")["Do you have Anxiety?"]
+        .apply(lambda x: round((x == "Yes").mean() * 100, 1))
+        .to_dict()
+    )
+
+    # Gender breakdown
+    insights["depression_by_gender"] = (
+        df.groupby("Choose your gender")["Do you have Depression?"]
+        .apply(lambda x: round((x == "Yes").mean() * 100, 1))
+        .to_dict()
+    )
+
+    insights["meta"] = {
+        "source": "shariful07/student-mental-health",
+        "records": len(df),
+        "summary": (
+            "101 university students: depression, anxiety, panic attacks "
+            "broken down by CGPA, year of study, and gender"
+        ),
+    }
+
+    pathlib.Path(STUDENT_HEALTH_FILE).parent.mkdir(parents=True, exist_ok=True)
+    with open(STUDENT_HEALTH_FILE, "w") as f:
+        json.dump(insights, f, indent=2)
+    print(f"✅  Student health insights → {STUDENT_HEALTH_FILE}")
+
+
+# ─────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────
 def build_nutrition_index():
-    print("📥  Downloading Kaggle dataset…")
+    # ── 1. Primary dataset ────────────────────
+    print("📥  Downloading primary dataset (Common Foods)…")
     path = kagglehub.dataset_download(
         "trolukovich/nutritional-values-for-common-foods-and-products"
     )
     print(f"✅  Downloaded to: {path}\n")
 
-    # Find the CSV file(s)
     csv_files = glob.glob(os.path.join(path, "**", "*.csv"), recursive=True)
     if not csv_files:
         raise FileNotFoundError(f"No CSV found in {path}")
@@ -189,24 +442,17 @@ def build_nutrition_index():
     print(f"    Shape: {df.shape[0]} rows × {df.shape[1]} columns")
     print(f"    Columns: {list(df.columns)}\n")
 
-    # Normalise column names to lowercase
     df.columns = [c.strip().lower() for c in df.columns]
     rename = {c: COL_MAP[c] for c in df.columns if c in COL_MAP}
     df = df.rename(columns=rename)
-
-    # Drop duplicate column names that arise when multiple raw columns map to
-    # the same target (e.g. both 'total_fat' and 'fat' → 'fat_g')
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
 
     if "name" not in df.columns:
-        raise ValueError("Could not find a food name column in dataset. "
-                         "Add it to COL_MAP.")
+        raise ValueError("Could not find a food name column in dataset.")
 
-    # Drop rows with no name; clean string
     df = df.dropna(subset=["name"])
     df["name"] = df["name"].astype(str).str.strip()
 
-    # Build keep_cols: only mapped target columns that exist, deduplicated (preserving order)
     seen = set()
     keep_cols = ["name"]
     for v in COL_MAP.values():
@@ -215,20 +461,14 @@ def build_nutrition_index():
             seen.add(v)
     df = df[keep_cols].copy()
 
-    # Convert numeric columns to float.
-    # Many values are stored as unit-annotated strings e.g. "9.17 g", "2.53 mg".
-    # Strip everything except the leading number before parsing.
     numeric_cols = [c for c in keep_cols if c != "name"]
     for col in numeric_cols:
         df[col] = (
-            df[col]
-            .astype(str)
-            .str.extract(r"([\d]*\.?[\d]+)")[0]   # pull out the numeric part
+            df[col].astype(str).str.extract(r"([\d]*\.?[\d]+)")[0]
         )
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Build index dict: lowercase name → record
-    index = {}
+    index: dict = {}
     for _, row in df.iterrows():
         food_name = row["name"]
         record = {"name": food_name}
@@ -239,17 +479,34 @@ def build_nutrition_index():
         record["tags"] = auto_tag(record)
         index[food_name.lower()] = record
 
-    # Also build a tag → [food_names] reverse index for fast protocol lookups
+    print(f"    Primary foods loaded: {len(index):,}")
+
+    # ── 2. Open Food Facts merge ──────────────
+    try:
+        off_index = _load_openfoodfacts()
+        before = len(index)
+        for key, record in off_index.items():
+            if key not in index:   # primary dataset always wins
+                index[key] = record
+        print(f"    Total after merge: {len(index):,} (+{len(index)-before:,} new)")
+    except Exception as e:
+        print(f"⚠️  Open Food Facts skipped: {e}")
+
+    # ── 3. Tag index ──────────────────────────
     tag_index: dict = {}
     for food_key, record in index.items():
         for tag in record.get("tags", []):
             tag_index.setdefault(tag, [])
-            if len(tag_index[tag]) < 30:   # cap at 30 per tag
+            if len(tag_index[tag]) < 50:
                 tag_index[tag].append(record["name"])
 
+    # ── 4. Save nutrition index ───────────────
     output = {
         "meta": {
-            "source": "trolukovich/nutritional-values-for-common-foods-and-products",
+            "sources": [
+                "trolukovich/nutritional-values-for-common-foods-and-products",
+                "openfoodfacts/world-food-facts",
+            ],
             "total_foods": len(index),
             "columns": numeric_cols,
         },
@@ -257,14 +514,25 @@ def build_nutrition_index():
         "tag_index": tag_index,
     }
 
-    # Save
     pathlib.Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w") as f:
         json.dump(output, f, indent=2)
 
-    print(f"💾  Saved nutrition index → {OUTPUT_FILE}")
+    print(f"\n💾  Saved nutrition index → {OUTPUT_FILE}")
     print(f"    Foods indexed : {len(index):,}")
     print(f"    Protocol tags : {list(tag_index.keys())}")
+
+    # ── 5. Sleep insights ─────────────────────
+    try:
+        build_sleep_insights()
+    except Exception as e:
+        print(f"⚠️  Sleep insights skipped: {e}")
+
+    # ── 6. Student mental health insights ─────
+    try:
+        build_student_health_insights()
+    except Exception as e:
+        print(f"⚠️  Student health insights skipped: {e}")
 
 
 if __name__ == "__main__":

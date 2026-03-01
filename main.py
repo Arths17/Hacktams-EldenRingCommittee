@@ -211,11 +211,12 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
-            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context
+            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context
 
             nutrition_db.load()
-            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
-            system_full = SYSTEM_PROMPT + "\n\n" + profile_to_context(profile) + nutrition_ctx
+            nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
+            research_ctx   = load_research_context()
+            system_full    = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile) + nutrition_ctx
 
             messages = [
                 {"role": "system", "content": system_full},
@@ -390,15 +391,12 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
-            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context
+            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context
 
             nutrition_db.load()
-            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
-            system_full = SYSTEM_PROMPT + "\n\n" + profile_to_context(profile) + nutrition_ctx
-
-            messages = [
-                {"role": "system", "content": system_full},
-                {"role": "user",   "content": message},
+            nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
+            research_ctx   = load_research_context()
+            system_full    = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile) + nutrition_ctx
             ]
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:

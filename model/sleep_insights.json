@@ -1,0 +1,45 @@
+{
+  "sleep_quality_by_hours": {
+    "5-6h": 5.73,
+    "6-7h": 6.26,
+    "7-8h": 7.84,
+    ">8h": 9.0
+  },
+  "stress_by_sleep_hours": {
+    "5-6h": 8.0,
+    "6-7h": 6.53,
+    "7-8h": 4.79,
+    ">8h": 3.03
+  },
+  "sleep_quality_by_activity": {
+    "low(<30min)": 7.35,
+    "moderate(30-60)": 7.06,
+    "high(60-90)": 7.59
+  },
+  "sleep_quality_by_bmi": {
+    "Normal": 7.66,
+    "Normal Weight": 7.43,
+    "Obese": 6.4,
+    "Overweight": 6.9
+  },
+  "pct_high_stress_with_low_sleep": 100.0,
+  "optimal_sleep_range_for_stress": ">8h",
+  "sleep_by_occupation": {
+    "Accountant": 7.1,
+    "Doctor": 7.0,
+    "Engineer": 8.0,
+    "Lawyer": 7.4,
+    "Manager": 6.9,
+    "Nurse": 7.1,
+    "Sales Representative": 5.9,
+    "Salesperson": 6.4,
+    "Scientist": 6.0,
+    "Software Engineer": 6.8,
+    "Teacher": 6.7
+  },
+  "meta": {
+    "source": "uom190346a/sleep-health-and-lifestyle-dataset",
+    "records": 374,
+    "summary": "374 adults: sleep duration/quality, stress (1-10), physical activity, BMI, sleep disorders"
+  }
+}

@@ -610,6 +610,88 @@ def profile_to_context(
 
 
 # ──────────────────────────────────────────────
+# RESEARCH CONTEXT LOADER
+# Loads sleep_insights.json + student_health.json and formats them
+# as evidence-based text blocks injected into the AI system prompt.
+# ──────────────────────────────────────────────
+def load_research_context() -> str:
+    """Return a formatted string of evidence-based stats from the Kaggle insight files."""
+    model_dir = os.path.dirname(os.path.abspath(__file__))
+    lines: list[str] = []
+
+    # ── Sleep Health & Lifestyle (374 adults) ────────────────────
+    sleep_file = os.path.join(model_dir, "sleep_insights.json")
+    if os.path.exists(sleep_file):
+        try:
+            with open(sleep_file) as f:
+                d = json.load(f)
+            lines.append(
+                "\n══ EVIDENCE-BASED SLEEP RESEARCH  "
+                "(source: 374-adult sleep-health study) ══"
+            )
+            sqh = d.get("sleep_quality_by_hours", {})
+            if sqh:
+                lines.append("Sleep quality (1–10 scale) by nightly hours:")
+                for bucket, q in sqh.items():
+                    lines.append(f"  {bucket}: quality {q}/10")
+            ssh = d.get("stress_by_sleep_hours", {})
+            if ssh:
+                lines.append("Stress level (1–10) by nightly hours:")
+                for bucket, s in ssh.items():
+                    lines.append(f"  {bucket}: stress {s}/10")
+            pct = d.get("pct_high_stress_with_low_sleep")
+            if pct is not None:
+                lines.append(
+                    f"• {pct}% of people sleeping <6 h report high stress (≥7/10)"
+                )
+            opt = d.get("optimal_sleep_range_for_stress")
+            if opt:
+                lines.append(f"• Optimal nightly sleep window for lowest stress: {opt}")
+            sqa = d.get("sleep_quality_by_activity", {})
+            if sqa:
+                lines.append("Sleep quality by daily physical activity:")
+                for bucket, q in sqa.items():
+                    lines.append(f"  {bucket}: quality {q}/10")
+        except Exception:
+            pass
+
+    # ── Student Mental Health (101 university students) ──────────
+    mh_file = os.path.join(model_dir, "student_health.json")
+    if os.path.exists(mh_file):
+        try:
+            with open(mh_file) as f:
+                d = json.load(f)
+            lines.append(
+                "\n══ STUDENT MENTAL HEALTH RESEARCH  "
+                "(source: 101-student university study) ══"
+            )
+            dep = d.get("depression_prevalence_pct")
+            if dep is not None:
+                lines.append(f"• Depression prevalence: {dep}% of students")
+            anx = d.get("anxiety_prevalence_pct")
+            if anx is not None:
+                lines.append(f"• Anxiety prevalence: {anx}% of students")
+            pan = d.get("panic_attack_prevalence_pct")
+            if pan is not None:
+                lines.append(f"• Panic attack prevalence: {pan}% of students")
+            both = d.get("depression_and_anxiety_pct")
+            if both is not None:
+                lines.append(f"• Co-occurring depression + anxiety: {both}% of students")
+            tx = d.get("sought_treatment_pct")
+            if tx is not None:
+                lines.append(f"• Only {tx}% sought professional treatment")
+            dep_cgpa = d.get("depression_by_cgpa", {})
+            if dep_cgpa:
+                lines.append("Depression rate by CGPA band:")
+                for cgpa, pct in dep_cgpa.items():
+                    lines.append(f"  CGPA {cgpa}: {pct}%")
+        except Exception:
+            pass
+
+    return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────
 # MAIN
 # ──────────────────────────────────────────────
 def main():
@@ -707,8 +789,13 @@ def main():
     seed_query    = "personalized health plan " + " ".join(state.get("goals", []))
     nutrition_ctx = rag.query(seed_query, [p for p, _ in prioritized[:5]], n=15)
 
+    # ── Research context (sleep + student MH stats) ─────────────
+    research_ctx = load_research_context()
+    if research_ctx:
+        print("  📊  Research context loaded (sleep + mental health data)")
+
     # Build conversation history (Ollama multi-turn)
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + research_ctx}]
 
     # Seed with profile + analysis + memory + priority block + RAG nutrition
     seed_message = profile_to_context(profile, analysis, priority_block, nutrition_ctx, memory_ctx)

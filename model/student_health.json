@@ -1,0 +1,33 @@
+{
+  "depression_prevalence_pct": 34.7,
+  "anxiety_prevalence_pct": 33.7,
+  "panic_attack_prevalence_pct": 32.7,
+  "sought_treatment_pct": 5.9,
+  "depression_and_anxiety_pct": 17.8,
+  "depression_by_cgpa": {
+    "0 - 1.99": 0.0,
+    "2.00 - 2.49": 0.0,
+    "2.50 - 2.99": 75.0,
+    "3.00 - 3.49": 44.2,
+    "3.50 - 4.00": 25.5,
+    "3.50 - 4.00 ": 100.0
+  },
+  "anxiety_by_year": {
+    "Year 1": 50.0,
+    "Year 2": 43.8,
+    "Year 3": 36.8,
+    "year 1": 31.7,
+    "year 2": 30.0,
+    "year 3": 20.0,
+    "year 4": 25.0
+  },
+  "depression_by_gender": {
+    "Female": 38.7,
+    "Male": 23.1
+  },
+  "meta": {
+    "source": "shariful07/student-mental-health",
+    "records": 101,
+    "summary": "101 university students: depression, anxiety, panic attacks broken down by CGPA, year of study, and gender"
+  }
+}
