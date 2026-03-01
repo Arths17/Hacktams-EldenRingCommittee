@@ -7,12 +7,24 @@ import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import styles from "./progress.module.css";
 
+const WORKOUT_TYPES = [
+  "Strength Training", "Cardio", "HIIT", "Yoga", "Pilates",
+  "Running", "Cycling", "Swimming", "Basketball", "Soccer",
+  "Tennis", "Hiking", "Stretching", "Other",
+];
+
 export default function ProgressPage() {
   const router = useRouter();
-  const { user, userProfile, weeklyMeals, mealsLoading, fetchWeeklyMeals, activityMetrics, workouts, fetchWorkouts } = useApp();
-  
-  const [timeRange, setTimeRange] = useState("week"); // week, month, year
-  const [churnRisk, setChurnRisk] = useState(null);
+  const { user, userProfile, weeklyMeals, mealsLoading, fetchWeeklyMeals, activityMetrics, workouts, fetchWorkouts, addWorkout, deleteWorkout } = useApp();
+  const [timeRange, setTimeRange] = useState("week");
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [workoutSaving, setWorkoutSaving] = useState(false);
+  const [newWorkout, setNewWorkout] = useState({
+    type: "Strength Training",
+    duration: "",
+    notes: "",
+    date: new Date().toISOString().split("T")[0],
+  });
 
   useEffect(() => {
     // Fetch weekly meals data when component mounts
