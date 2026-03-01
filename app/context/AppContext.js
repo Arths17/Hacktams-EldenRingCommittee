@@ -304,6 +304,10 @@ export function AppProvider({ children }) {
       const data = await response.json();
       
       if (!data.success) {
+        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
+        setUser(null);
+        setUserProfile(null);
         router.push("/login");
         return;
       }
@@ -321,6 +325,10 @@ export function AppProvider({ children }) {
       ]);
     } catch (error) {
       console.error("Failed to fetch user data:", error);
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      setUser(null);
+      setUserProfile(null);
       router.push("/login");
     } finally {
       setLoading(false);

@@ -15,6 +15,7 @@
   z-index: 1000;
   padding: 14px 24px 0;
   pointer-events: none;
+  animation: navFadeIn 0.4s ease-out;
 }
 
 /* floating frosted-glass pill */
@@ -35,6 +36,12 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navbarInner:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 12px 34px rgba(0,0,0,0.4);
 }
 
 /* logo */
@@ -44,6 +51,11 @@
   gap: 8px;
   text-decoration: none;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.brand:hover {
+  transform: translateY(-1px);
 }
 
 .mobileToggle {
@@ -56,6 +68,12 @@
   color: #fff;
   font-size: 1.05rem;
   cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.mobileToggle:hover {
+  transform: scale(1.04);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .brandMark {
@@ -177,80 +195,6 @@
   transform: translateY(-1px);
 }
 
-.profileMenuWrap {
-  position: relative;
-}
-
-.profileTrigger {
-  height: 36px;
-  padding: 0 10px 0 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  font-size: 0.825rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.profileTrigger:hover {
-  background: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
-}
-
-.profileAvatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.73rem;
-  font-weight: 700;
-}
-
-.profileText {
-  line-height: 1;
-}
-
-.profileMenu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 128px;
-  padding: 6px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(10, 10, 10, 0.92);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  z-index: 1100;
-}
-
-.menuLogoutBtn {
-  width: 100%;
-  border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 10px;
-  text-align: left;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.menuLogoutBtn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
 /* Explicit link class (mirrors .navLinks a) */
 .navLink {
   color: rgba(255, 255, 255, 0.65);
@@ -266,6 +210,7 @@
 .navLink:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 /* Active page highlight */
@@ -329,24 +274,47 @@
 
   .navLinks,
   .navActions {
-    display: none;
+    display: flex;
     width: 100%;
     justify-content: flex-start;
     order: 3;
     padding-top: 4px;
     flex-wrap: wrap;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: max-height 0.25s ease, opacity 0.2s ease, transform 0.2s ease;
   }
 
   .navLinksOpen {
-    display: flex;
+    max-height: 260px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
   }
 
   .navActionsOpen {
-    display: flex;
+    max-height: 120px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
     gap: 8px;
   }
 
   .navLink {
     background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+@keyframes navFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

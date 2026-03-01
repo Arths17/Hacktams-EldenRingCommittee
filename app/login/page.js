@@ -24,7 +24,38 @@ export default function LoginPage() {
   // Auto-redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (token) router.push("/dashboard");
+    if (!token) return;
+
+    let cancelled = false;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+    async function validateTokenAndRedirect() {
+      try {
+        const response = await fetch(`${apiBase}/api/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+        const data = await response.json();
+        if (!cancelled && data?.success) {
+          router.push("/dashboard");
+          return;
+        }
+      } catch {
+        // fall through and clear token
+      }
+
+      if (!cancelled) {
+        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
+      }
+    }
+
+    validateTokenAndRedirect();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function handleSubmit(e) {
