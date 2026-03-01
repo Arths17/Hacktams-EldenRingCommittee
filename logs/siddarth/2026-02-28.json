@@ -1,0 +1,11 @@
+{
+  "mood": "neutral",
+  "energy": "1",
+  "sleep_hours": 8.0,
+  "protocols": [
+    "energy_protocol",
+    "gut_protocol",
+    "b_complex_protocol"
+  ],
+  "date": "2026-02-28"
+}

@@ -10,17 +10,21 @@ import json
 import textwrap
 import sys
 import ollama
+from datetime import datetime
 
 # Add model/ directory to path so we can import nutrition_db / user_state
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nutrition_db
 import user_state
+import rag
+import session_memory
 
 # ──────────────────────────────────────────────
 # CONFIG
 # ──────────────────────────────────────────────
-# Change to any model you have pulled: llama3.1, mistral, qwen2.5:7b, phi3, etc.
-MODEL_NAME   = "llama3.2"
+# llama3.1:8b gives much better health reasoning. Already pulled!
+# Switch model: HEALTH_MODEL=llama3.2 python model/model.py
+MODEL_NAME   = os.environ.get("HEALTH_MODEL", "llama3.1:8b")
 PROFILE_FILE = "user_profile.json"
 OLLAMA_HOST  = "http://localhost:11434"   # default; override if Ollama runs elsewhere
 
@@ -195,6 +199,23 @@ GOAL_ALIASES = {
     "stay healthy": "general health",
 }
 
+DIET_ALIASES = {
+    # vegetarian typos & shorthands
+    "vegetarian": "vegetarian", "vegitarian": "vegetarian", "vegetrain": "vegetarian",
+    "vegitarian": "vegetarian", "vegatarian": "vegetarian", "vegiterian": "vegetarian",
+    "veg": "vegetarian", "veggie": "vegetarian", "vegetarean": "vegetarian",
+    # vegan
+    "vegan": "vegan", "plant based": "vegan", "plant-based": "vegan", "plantbased": "vegan",
+    # omnivore
+    "omnivore": "omnivore", "omni": "omnivore", "everything": "omnivore",
+    "non veg": "omnivore", "non-veg": "omnivore", "meat eater": "omnivore",
+    # halal / kosher
+    "halal": "halal", "kosher": "kosher",
+    # other
+    "pescatarian": "pescatarian", "pescetarian": "pescatarian", "pescitarian": "pescatarian",
+    "keto": "keto", "paleo": "paleo", "gluten free": "gluten-free", "gluten-free": "gluten-free",
+}
+
 
 def parse_scale(raw: str) -> tuple:
     """Parse a 1–10 integer. Returns (int_value_or_None, is_in_range)."""
@@ -218,15 +239,26 @@ def parse_height(raw: str) -> tuple:
 def parse_sleep_schedule(raw: str) -> tuple:
     """
     Parse sleep schedule string, return (raw, sleep_hours_or_None, parseable).
-    Handles patterns like '2am-8am', '11pm-7am', '2:30am-9am'.
+    Handles: '2am-8am', '11pm-7am', '2:30am-9am',
+             '2am and 8am', '2am to 8am', 'sleep 2am wake 8am',
+             single-time inputs like '2am-4am' (treated as bed→wake).
     """
-    cleaned = raw.lower().replace("–", "-").replace("—", "-").replace(" to ", "-")
-    pattern = r"(\d{1,2}(?::\d{2})?)\s*(am|pm)\s*-\s*(\d{1,2}(?::\d{2})?)\s*(am|pm)"
-    m = re.search(pattern, cleaned)
-    if not m:
+    # Normalise separators so everything becomes "TIME1 - TIME2"
+    cleaned = raw.lower()
+    cleaned = cleaned.replace("–", "-").replace("—", "-")
+    cleaned = re.sub(r"\bto\b",   "-", cleaned)
+    cleaned = re.sub(r"\band\b",  "-", cleaned)
+    cleaned = re.sub(r"\bwake\s*(up)?\b", "-", cleaned)
+    cleaned = re.sub(r"\buntil\b", "-", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned)   # collapse double dashes
+
+    time_pat = r"(\d{1,2}(?::\d{2})?)\s*(am|pm)"
+    times = re.findall(time_pat, cleaned)
+
+    if len(times) < 2:
         return (raw, None, False)
 
-    def to_float_hours(time_str, ampm):
+    def to_float_hours(time_str: str, ampm: str) -> float:
         parts = time_str.split(":")
         h = int(parts[0])
         mins = int(parts[1]) if len(parts) > 1 else 0
@@ -236,9 +268,13 @@ def parse_sleep_schedule(raw: str) -> tuple:
             h = 0
         return h + mins / 60.0
 
-    bed  = to_float_hours(m.group(1), m.group(2))
-    wake = to_float_hours(m.group(3), m.group(4))
+    bed  = to_float_hours(times[0][0], times[0][1])
+    wake = to_float_hours(times[1][0], times[1][1])
+
+    # If both times are identical or result is 0, mark unparseable
     hours = (24 - bed + wake) if bed > wake else (wake - bed)
+    if hours == 0 or hours > 23:
+        return (raw, None, False)
     return (raw, round(hours, 1), True)
 
 
@@ -298,6 +334,12 @@ def validate_field(key: str, raw: str) -> tuple:
 
     if key == "goal":
         normalized = GOAL_ALIASES.get(raw.lower(), raw.lower())
+        if normalized != raw.lower():
+            print(f"  ℹ️   '{raw}' → interpreted as '{normalized}'")
+        return normalized, flags
+
+    if key == "diet_type":
+        normalized = DIET_ALIASES.get(raw.lower(), raw.lower())
         if normalized != raw.lower():
             print(f"  ℹ️   '{raw}' → interpreted as '{normalized}'")
         return normalized, flags
@@ -530,8 +572,14 @@ def collect_profile() -> dict:
     return profile
 
 
-def profile_to_context(profile: dict, analysis: dict, priority_block: str = "") -> str:
-    """Format the profile + analysis block + priority block + nutrition data into the AI seed message."""
+def profile_to_context(
+    profile:        dict,
+    analysis:       dict,
+    priority_block: str = "",
+    nutrition_ctx:  str = "",
+    memory_ctx:     str = "",
+) -> str:
+    """Build the full AI seed message: profile + risk + memory + priorities + RAG foods."""
     labels = {k: q.split("?")[0].lstrip("📏⚖️🎯🥗⚠️💰🍳🌍📅😴🏋️😰⚡🌙💭📝👋🎂⚧ ").strip()
               for k, q in PROFILE_QUESTIONS}
     lines = ["Here is my complete profile:\n"]
@@ -540,24 +588,23 @@ def profile_to_context(profile: dict, analysis: dict, priority_block: str = "") 
         lines.append(f"  • {label}: {val}")
     lines.append(format_analysis_block(analysis))
 
-    # Inject User State Vector + Protocol Priority + Constraint blocks
+    if memory_ctx:
+        lines.append(memory_ctx)
     if priority_block:
         lines.append(priority_block)
-
-    # Inject real nutritional data if the index is loaded
-    nutrition_ctx = nutrition_db.build_nutrition_context(profile)
     if nutrition_ctx:
         lines.append(nutrition_ctx)
 
     lines.append(
-        "\nUsing ALL blocks above (profile, risk analysis, PROTOCOL PRIORITY SCORES, "
-        "ACTIVE CONSTRAINTS, DAILY NUTRIENT TARGETS, and the nutrition database),\n"
+        "\nUsing ALL blocks above (profile, risk analysis, recent history, "
+        "PROTOCOL PRIORITY SCORES, ACTIVE CONSTRAINTS, and the nutrition database),\n"
         "generate my full personalized health & lifestyle plan across all 12 sections.\n"
-        "Follow the PROTOCOL PRIORITY SCORES order — address 🔴 HIGH protocols first.\n"
+        "Reference my recent history trends when relevant.\n"
+        "Follow PROTOCOL PRIORITY SCORES order — address 🔴 HIGH protocols first.\n"
         "Respect every ACTIVE CONSTRAINT (time, budget, kitchen, diet, allergies).\n"
         "Reference specific real foods from the nutrition database by name and macros.\n"
         "For CRITICAL risks, acknowledge severity and provide immediate actionable steps.\n"
-        "If DATA_CONFIDENCE is LOW, ask clarifying questions before giving strong recommendations."
+        "If DATA_CONFIDENCE is LOW, ask clarifying questions before strong recommendations."
     )
     return "\n".join(lines)
 
@@ -582,6 +629,11 @@ def main():
     if nutrition_db.load(nutrition_index_path):
         total = nutrition_db.meta().get('total_foods', '?')
         print(f"  🥗  Nutrition DB loaded — {total:,} foods indexed")
+        # Build / reuse semantic search index (one-time ~60s, then persists to chroma_db/)
+        if rag.build(nutrition_index_path):
+            print("  🔍  Semantic search: ready")
+        else:
+            print("  🔍  Semantic search: tag fallback  (pip install chromadb to enable)")
     else:
         print("  ⚠️   Nutrition DB not found. Run 'python train.py' to build it.")
         print("       The AI will still work, just without real food data.\n")
@@ -600,11 +652,25 @@ def main():
         print("  First time here! Let's build your profile.\n")
         profile = collect_profile()
 
+    user_name = profile.get("name", "default")
+
+    # ── Optional daily check-in (returning users, first visit of the day) ─────
+    _prev_logs = session_memory.load_recent_logs(user_name)
+    _today     = datetime.now().strftime("%Y-%m-%d")
+    if _prev_logs and not any(l.get("date") == _today for l in _prev_logs):
+        _do_ci = input("  📊  Quick daily check-in? (30 sec)  (y / n)\n  ▶  ").strip().lower()
+        if _do_ci == "y":
+            _ci = session_memory.run_checkin(profile)
+            session_memory.save_checkin(user_name, _ci)
+            if _ci.get("mood"):   profile["mood"]         = _ci["mood"]
+            if _ci.get("energy"): profile["energy_level"] = str(_ci["energy"])
+            save_profile(profile)
+            print("  ✅  Check-in saved!\n")
+
     # Run analysis engine
     analysis = analyze_profile(profile)
 
     # ── User State Vector ───────────────────────────────────────
-    user_name       = profile.get("name", "default")
     state           = user_state.analyze_user_state(profile)
     protocols       = user_state.map_state_to_protocols(state)
     constraints     = user_state.build_constraints_from_profile(profile)
@@ -633,23 +699,45 @@ def main():
             print(f"     • {flag}")
         print("─" * 60)
 
+    # ── Memory context (last 7 days of check-ins) ───────────────────────
+    recent_logs   = session_memory.load_recent_logs(user_name)
+    memory_ctx    = session_memory.format_memory_context(recent_logs)
+
+    # ── RAG: top-15 semantically relevant foods for this user's goals ────
+    seed_query    = "personalized health plan " + " ".join(state.get("goals", []))
+    nutrition_ctx = rag.query(seed_query, [p for p, _ in prioritized[:5]], n=15)
+
     # Build conversation history (Ollama multi-turn)
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # Seed with profile + analysis + priority block
-    seed_message = profile_to_context(profile, analysis, priority_block)
+    # Seed with profile + analysis + memory + priority block + RAG nutrition
+    seed_message = profile_to_context(profile, analysis, priority_block, nutrition_ctx, memory_ctx)
     messages.append({"role": "user", "content": seed_message})
     print("\n⏳  Generating your personalized plan…\n")
     try:
-        resp  = ollama.chat(model=MODEL_NAME, messages=messages)
-        reply = resp.message.content
+        stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
+        reply_parts = []
+        for chunk in stream:
+            token = chunk.message.content
+            print(token, end="", flush=True)
+            reply_parts.append(token)
+        reply = "".join(reply_parts)
         messages.append({"role": "assistant", "content": reply})
-        print(wrap(reply))
+        print()   # newline after stream ends
     except Exception as e:
-        print(f"⚠️  Ollama error: {e}")
+        print(f"\n⚠️  Ollama error: {e}")
         print(f"    • Ensure the model is available:  ollama pull {MODEL_NAME}")
         return
     print("\n" + "─" * 60)
+
+    # Save today's session automatically
+    session_memory.save_checkin(user_name, {
+        "mood":         profile.get("mood", "neutral"),
+        "energy":       profile.get("energy_level", "5"),
+        "sleep_hours":  state.get("sleep_hours"),
+        "protocols":    [p for p, _ in prioritized[:3]],
+        "date":         datetime.now().strftime("%Y-%m-%d"),
+    })
 
     print("\n💬  Ask follow-up questions, report state changes, or request meal swaps.")
     print("    Type 'quit' or 'exit' to end.\n")
@@ -692,17 +780,34 @@ def main():
             top_3 = ", ".join(p.replace("_protocol", "") for p, _ in prioritized[:3])
             print(f"  📊  Feedback recorded {feedback} — top protocols: [{top_3}]\n")
 
+        # RAG: fetch foods relevant to this specific follow-up query
+        _rag_ctx = rag.query(user_input, [p for p, _ in prioritized[:5]], n=8)
+        _send    = (
+            f"[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
+            if _rag_ctx else user_input
+        )
+
         print("\n⏳  Thinking…\n")
         try:
-            messages.append({"role": "user", "content": user_input})
-            resp  = ollama.chat(model=MODEL_NAME, messages=messages)
-            reply = resp.message.content
+            messages.append({"role": "user", "content": _send})
+
+            # Trim context: keep system prompt (index 0) + last 10 turns
+            system_msg = messages[0]
+            recent     = messages[1:][-10:]
+            trimmed    = [system_msg] + recent
+
+            stream = ollama.chat(model=MODEL_NAME, messages=trimmed, stream=True)
+            reply_parts = []
+            for chunk in stream:
+                token = chunk.message.content
+                print(token, end="", flush=True)
+                reply_parts.append(token)
+            reply = "".join(reply_parts)
             messages.append({"role": "assistant", "content": reply})
-            print(wrap(reply))
+            print()   # newline after stream ends
         except Exception as e:
-            # Pop the unanswered user message so history stays clean
-            messages.pop()
-            print(f"⚠️  Ollama error: {e}")
+            messages.pop()   # remove unanswered user message
+            print(f"\n⚠️  Ollama error: {e}")
         print("\n" + "─" * 60 + "\n")
 
 
