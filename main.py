@@ -58,29 +58,58 @@ except Exception as e:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
 
 # Import exceptions and models (with graceful fallback)
+# Define fallback classes first
+class HealthOSAPIError(Exception):
+    """Base exception class."""
+    def to_response(self):
+        return JSONResponse({"success": False, "error": str(self)}, status_code=400)
+
+class ValidationError(HealthOSAPIError):
+    """Validation error."""
+    pass
+
+class InternalServerError(HealthOSAPIError):
+    """Internal server error."""
+    pass
+
+def get_rate_limiter():
+    """Fallback rate limiter."""
+    class FallbackRateLimiter:
+        def check_rate_limit(self, request, endpoint, username=None):
+            pass
+    return FallbackRateLimiter()
+
+# Try to import actual implementations
 try:
     from api_exceptions import (
-        HealthOSAPIError,
+        HealthOSAPIError as _HealthOSAPIError,
         AuthenticationError,
         AuthorizationError,
-        ValidationError,
+        ValidationError as _ValidationError,
         ResourceNotFoundError,
         RateLimitError,
         ConflictError,
-        InternalServerError,
+        InternalServerError as _InternalServerError,
         ExternalServiceError,
     )
     from api_models import AuthResponse, UserResponse, ErrorResponse
-    from rate_limiter import get_rate_limiter
+    from rate_limiter import get_rate_limiter as _get_rate_limiter
+    
+    # Use imported versions
+    HealthOSAPIError = _HealthOSAPIError  # type: ignore
+    ValidationError = _ValidationError  # type: ignore
+    InternalServerError = _InternalServerError  # type: ignore
+    get_rate_limiter = _get_rate_limiter  # type: ignore
     USE_API_UTILS = True
 except ImportError as e:
     logger.warning(f"API utilities not available: {e} (using basic error handling)")
     USE_API_UTILS = False
-    
-    # Minimal fallback classes
-    class HealthOSAPIError(Exception):
-        def to_response(self):
-            return JSONResponse({"success": False, "error": str(self)}, status_code=400)
+    AuthenticationError = HealthOSAPIError  # type: ignore
+    AuthorizationError = HealthOSAPIError  # type: ignore
+    ResourceNotFoundError = HealthOSAPIError  # type: ignore
+    RateLimitError = HealthOSAPIError  # type: ignore
+    ConflictError = HealthOSAPIError  # type: ignore
+    ExternalServiceError = HealthOSAPIError  # type: ignore
 
 # ══════════════════════════════════════════════
 # APP SETUP
@@ -180,17 +209,16 @@ def _decode_token(request: Request) -> Optional[dict]:
 def _validate_username(username: str) -> None:
     """Validate username format."""
     if not (3 <= len(username) <= 50):
-        raise ValidationError("Username must be 3-50 characters", field="username")
+        raise ValidationError("Username must be 3-50 characters")
     if not re.match(r"^[a-zA-Z0-9_-]+$", username):
         raise ValidationError(
-            "Username must contain only letters, numbers, hyphen, underscore",
-            field="username"
+            "Username must contain only letters, numbers, hyphen, underscore"
         ) if USE_API_UTILS else ValueError("Invalid username format")
 
 def _validate_password(password: str) -> None:
     """Validate password strength."""
     if not (8 <= len(password) <= 128):
-        raise ValidationError("Password must be 8-128 characters", field="password")
+        raise ValidationError("Password must be 8-128 characters")
 
 def _local_login(username: str, password: str) -> tuple[bool, Optional[str], Optional[str]]:
     """Local file-based login (fallback)."""
@@ -440,7 +468,7 @@ async def signup(
             _validate_username(username)
             _validate_password(password)
             if password != password_confirm:
-                raise ValidationError("Passwords do not match", field="password_confirm")
+                raise ValidationError("Passwords do not match")
         except Exception as e:
             logger.warning(f"Signup validation failed: {e}")
             if USE_API_UTILS and isinstance(e, ValidationError):
@@ -463,7 +491,10 @@ async def signup(
                     "password": hashed,
                 }).execute()
                 
-                uid = (res.data[0] or {}).get("id") if res.data else None
+                uid: Optional[str] = None
+                if res.data:
+                    user_row = _cast(dict, res.data[0])
+                    uid = _cast(Optional[str], user_row.get("id"))
                 token = _make_token(username, uid)
                 logger.info(f"✓ Signup successful: {username} (Supabase)")
                 return JSONResponse({
