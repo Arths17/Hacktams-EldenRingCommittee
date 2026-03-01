@@ -246,8 +246,26 @@ export default function AIPage() {
   const [profileReady, setProfileReady] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [checkingProfile, setCheckingProfile] = useState(true);
+  const [chatUser, setChatUser] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Persist messages to localStorage per user
+  const getChatKey = (username) => `cf-chat-${username || "anon"}`;
+
+  const saveMessages = (msgs, username) => {
+    try {
+      // Keep last 100 messages to avoid bloating storage
+      localStorage.setItem(getChatKey(username), JSON.stringify(msgs.slice(-100)));
+    } catch { /* no-op */ }
+  };
+
+  const loadMessages = (username) => {
+    try {
+      const raw = localStorage.getItem(getChatKey(username));
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  };
 
   // Auto-resize textarea
   useEffect(() => {
@@ -277,8 +295,13 @@ export default function AIPage() {
 
         // Check if user has a profile
         if (data.profile && Object.keys(data.profile).length > 0) {
-          setProfileName(data.profile.name || data.username || "");
+          const uname = data.username || "";
+          setProfileName(data.profile.name || uname);
+          setChatUser(uname);
           setProfileReady(true);
+          // Restore chat history
+          const saved = loadMessages(uname);
+          if (saved.length > 0) setMessages(saved);
           // Update localStorage as cache
           localStorage.setItem("campusfuel_profile", JSON.stringify(data.profile));
         } else {
@@ -305,7 +328,11 @@ export default function AIPage() {
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Persist chat history whenever messages change
+    if (chatUser && messages.length > 0) {
+      saveMessages(messages, chatUser);
+    }
+  }, [messages, chatUser]);
 
   async function sendMessage() {
     const text = input.trim();

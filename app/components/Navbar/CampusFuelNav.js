@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import styles from "./CampusFuelNav.module.css";
 import { useTheme } from "../ThemeProvider";
+import { useApp } from "../../context/AppContext";
 
 export default function CampusFuelNav() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
+  const { logout, user } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -59,9 +61,11 @@ export default function CampusFuelNav() {
           >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
-          <Link href="/ai" className={`${styles.btnAi} ${pathname === "/ai" ? styles.btnAiActive : ""}`}>
-            🤖 AI Coach
-          </Link>
+          {user && (
+            <button className={styles.logoutBtn} onClick={logout} title="Log out">
+              ↩ Logout
+            </button>
+          )}
         </div>
       </div>
     </header>
