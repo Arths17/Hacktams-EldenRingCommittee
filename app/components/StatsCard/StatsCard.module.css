@@ -1,22 +1,27 @@
 .card {
   background: var(--white);
-  border-radius: 14px;
-  padding: 22px 24px;
-  box-shadow: var(--card-shadow);
+  border-radius: 16px;
+  padding: 24px 26px;
+  box-shadow: 0 4px 24px rgba(20, 90, 50, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  border-top: 4px solid var(--green);
-  transition: transform 0.15s, box-shadow 0.15s;
+  gap: 16px;
+  border-top: 3px solid var(--green);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(20, 90, 50, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 48px rgba(20, 90, 50, 0.15);
+  border-top-color: var(--green-light);
 }
 
 .card.gold {
   border-top-color: var(--gold);
+}
+
+.card.gold:hover {
+  border-top-color: var(--gold-light);
 }
 
 .card.gold .progressBar {
@@ -24,7 +29,7 @@
 }
 
 .card.gold .iconWrap {
-  background: rgba(201, 155, 76, 0.12);
+  background: rgba(201, 155, 76, 0.10);
   color: var(--gold-dark);
 }
 
@@ -35,16 +40,17 @@
 }
 
 .iconWrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: rgba(20, 90, 50, 0.1);
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: rgba(20, 90, 50, 0.08);
   color: var(--green);
-  font-size: 22px;
+  font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid rgba(20, 90, 50, 0.1);
 }
 
 .info {
@@ -55,17 +61,18 @@
 
 .label {
   font-size: 13px;
-  color: var(--text-muted);
-  font-weight: 500;
+  color: var(--text-medium);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
 .value {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 800;
   color: var(--text-dark);
   line-height: 1.1;
+  letter-spacing: -0.5px;
 }
 
 .unit {
@@ -84,8 +91,8 @@
 }
 
 .progressTrack {
-  height: 6px;
-  background: var(--cream);
+  height: 7px;
+  background: var(--cream-dark);
   border-radius: 99px;
   overflow: hidden;
 }
@@ -95,10 +102,12 @@
   background: var(--green);
   border-radius: 99px;
   transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(20, 90, 50, 0.3);
 }
 
 .progressLabel {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-medium);
   margin-top: -8px;
+  font-weight: 600;
 }

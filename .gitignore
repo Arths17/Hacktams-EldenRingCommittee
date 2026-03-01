@@ -1,10 +1,16 @@
+# Environment variables
 .env
+.env.local
+.env*.local
+
+# Database and logs
 model/chroma_db/
 logs/
 
 # Dependencies
 node_modules/
 .venv/
+venv/
 
 # Next.js
 .next/
@@ -14,3 +20,13 @@ out/
 __pycache__/
 *.pyc
 *.pyo
+
+# Vercel
+.vercel
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

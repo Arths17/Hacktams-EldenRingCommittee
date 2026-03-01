@@ -785,6 +785,136 @@ def build_full_context(profile: dict, username: str) -> tuple[str, str]:
 
     return system_full, seed_message
 
+def chatbot_response(profile: dict, username: str, stream: bool = True, max_retries: int = 3) -> str:
+    """
+    Generate a chatbot response using the full context builder.
+    
+    Args:
+        profile: User profile dictionary
+        username: Username for context
+        stream: Whether to stream the response (default: True)
+        max_retries: Number of retry attempts on failure (default: 3)
+    
+    Returns:
+        Generated response string
+        
+    Raises:
+        ValueError: If profile or username is invalid
+        ConnectionError: If unable to connect to Ollama
+        RuntimeError: If response generation fails after all retries
+    """
+    # Input validation
+    if not profile or not isinstance(profile, dict):
+        raise ValueError("Invalid profile: must be a non-empty dictionary")
+    if not username or not isinstance(username, str):
+        raise ValueError("Invalid username: must be a non-empty string")
+    
+    # Verify Ollama is available
+    try:
+        ollama.list()
+    except Exception as e:
+        raise ConnectionError(
+            f"Cannot connect to Ollama at {OLLAMA_HOST}. "
+            f"Ensure Ollama is running with: ollama serve\n"
+            f"Error: {str(e)}"
+        )
+    
+    # Build context with error handling
+    try:
+        system_full, seed_message = build_full_context(profile, username)
+    except Exception as e:
+        raise RuntimeError(f"Failed to build context: {str(e)}")
+    
+    if not system_full or not seed_message:
+        raise ValueError("Context builder returned empty system prompt or message")
+    
+    messages = [
+        {"role": "system", "content": system_full},
+        {"role": "user", "content": seed_message}
+    ]
+    
+    # Retry logic with exponential backoff
+    import time
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            if stream:
+                # Streaming mode (matches main() implementation)
+                response_stream = ollama.chat(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    stream=True,
+                    options={
+                        "temperature": 0.7,
+                        "num_predict": 2000,
+                    }
+                )
+                
+                reply_parts = []
+                for chunk in response_stream:
+                    if hasattr(chunk, 'message') and hasattr(chunk.message, 'content'):
+                        token = chunk.message.content
+                        reply_parts.append(token)
+                    elif isinstance(chunk, dict) and 'message' in chunk:
+                        token = chunk['message'].get('content', '')
+                        reply_parts.append(token)
+                
+                reply = "".join(reply_parts)
+                
+                if not reply:
+                    raise RuntimeError("Received empty response from model")
+                    
+                return reply
+                
+            else:
+                # Non-streaming mode
+                response = ollama.chat(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    stream=False,
+                    options={
+                        "temperature": 0.7,
+                        "num_predict": 2000,
+                    }
+                )
+                
+                # Handle different response formats
+                if hasattr(response, 'message') and hasattr(response.message, 'content'):
+                    reply = response.message.content
+                elif isinstance(response, dict):
+                    reply = response.get('message', {}).get('content', '')
+                else:
+                    raise RuntimeError(f"Unexpected response format: {type(response)}")
+                
+                if not reply:
+                    raise RuntimeError("Received empty response from model")
+                    
+                return reply
+                
+        except KeyboardInterrupt:
+            # Allow user to interrupt
+            raise
+            
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                print(f"\n⚠️  Attempt {attempt + 1} failed: {str(e)}")
+                print(f"   Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                # Final attempt failed
+                error_msg = (
+                    f"Failed to generate response after {max_retries} attempts.\n"
+                    f"Last error: {str(last_error)}\n"
+                    f"Model: {MODEL_NAME}\n"
+                    f"Ensure the model is available: ollama pull {MODEL_NAME}"
+                )
+                raise RuntimeError(error_msg) from last_error
+    
+    # Should never reach here, but just in case
+    raise RuntimeError("Unexpected error in retry loop")
 
 # ──────────────────────────────────────────────
 # MAIN
