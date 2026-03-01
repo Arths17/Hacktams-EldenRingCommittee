@@ -22,6 +22,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
+  async function fetchWithFallback(urls, options) {
+    let lastError = null;
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, options);
+        return response;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("Network request failed");
+  }
+
   // Auto-redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -31,7 +44,10 @@ export default function LoginPage() {
 
     async function validateTokenAndRedirect() {
       try {
-        const response = await fetch(`${apiBase}/api/me`, {
+        const response = await fetchWithFallback([
+          "/api/me",
+          `${apiBase}/api/me`,
+        ], {
           headers: {
             Authorization: `Bearer ${token}`,
             "ngrok-skip-browser-warning": "true",
@@ -68,7 +84,10 @@ export default function LoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch(`${apiBase}/login`, {
+      const response = await fetchWithFallback([
+        "/api/login",
+        `${apiBase}/login`,
+      ], {
         method: "POST",
         credentials: "include",
         headers: { "ngrok-skip-browser-warning": "true" },
