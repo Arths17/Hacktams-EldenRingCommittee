@@ -396,23 +396,6 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
-<<<<<<< HEAD
-            from model.model import SYSTEM_PROMPT, MODEL_NAME, load_research_context
-
-            nutrition_db.load()
-            nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
-            research_ctx   = load_research_context()
-            
-            # Build context from profile (simplified version for API)
-            profile_ctx = "\n".join([f"  • {k}: {v}" for k, v in profile.items()])
-            system_full    = SYSTEM_PROMPT + research_ctx + "\n\nUser Profile:\n" + profile_ctx + nutrition_ctx
-
-            messages = [
-                {"role": "system", "content": system_full},
-                {"role": "user", "content": message},
-            ]
-            
-=======
             from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context, analyze_profile
 
             nutrition_db.load()
@@ -425,7 +408,6 @@ async def chat(request: Request):
                 {"role": "system", "content": system_full},
                 {"role": "user",   "content": message},
             ]
->>>>>>> f92db6cf008dd3366da344836c48fdcd195f2d24
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:
                 content = chunk["message"]["content"]
