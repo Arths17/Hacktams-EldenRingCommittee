@@ -226,9 +226,9 @@ def user_protocol_gaps(profile: dict) -> Dict[str, str]:
     except (ValueError, TypeError):
         stress = 5
 
-    sleep_q = profile.get("sleep_quality", "okay").lower()
-    mood    = profile.get("mood", "neutral").lower()
-    goal    = profile.get("goal", "general health").lower()
+    sleep_q = (profile.get("sleep_quality") or "okay").lower()
+    mood    = (profile.get("mood") or "neutral").lower()
+    goal    = (profile.get("goal") or "general health").lower()
 
     # Collect active states
     active_states: List[str] = []
@@ -430,12 +430,12 @@ def build_nutrition_context(profile: dict) -> str:
     if not _loaded:
         return ""
 
-    goal    = profile.get("goal", "general health").lower()
-    stress  = int(re.sub(r"[^\d]", "", str(profile.get("stress_level", 5))) or 5)
-    energy  = int(re.sub(r"[^\d]", "", str(profile.get("energy_level", 5))) or 5)
-    sleep_q = profile.get("sleep_quality", "okay").lower()
-    diet    = profile.get("diet_type", "omnivore").lower()
-    mood    = profile.get("mood", "neutral").lower()
+    goal    = (profile.get("goal") or "general health").lower()
+    stress  = int(re.sub(r"[^\d]", "", str(profile.get("stress_level") or 5)) or 5)
+    energy  = int(re.sub(r"[^\d]", "", str(profile.get("energy_level") or 5)) or 5)
+    sleep_q = (profile.get("sleep_quality") or "okay").lower()
+    diet    = (profile.get("diet_type") or "omnivore").lower()
+    mood    = (profile.get("mood") or "neutral").lower()
 
     is_veg  = "vegan" in diet or "vegetarian" in diet
     meat_kw = ["chicken", "beef", "pork", "turkey", "salmon", "tuna",
