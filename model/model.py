@@ -578,8 +578,9 @@ def profile_to_context(
     priority_block: str = "",
     nutrition_ctx:  str = "",
     memory_ctx:     str = "",
+    trend_ctx:      str = "",
 ) -> str:
-    """Build the full AI seed message: profile + risk + memory + priorities + RAG foods."""
+    """Build the full AI seed message: profile + risk + memory + trends + priorities + RAG foods."""
     labels = {k: q.split("?")[0].lstrip("📏⚖️🎯🥗⚠️💰🍳🌍📅😴🏋️😰⚡🌙💭📝👋🎂⚧ ").strip()
               for k, q in PROFILE_QUESTIONS}
     lines = ["Here is my complete profile:\n"]
@@ -590,6 +591,8 @@ def profile_to_context(
 
     if memory_ctx:
         lines.append(memory_ctx)
+    if trend_ctx:
+        lines.append(trend_ctx)
     if priority_block:
         lines.append(priority_block)
     if nutrition_ctx:
@@ -597,9 +600,11 @@ def profile_to_context(
 
     lines.append(
         "\nUsing ALL blocks above (profile, risk analysis, recent history, "
-        "PROTOCOL PRIORITY SCORES, ACTIVE CONSTRAINTS, and the nutrition database),\n"
+        "7-DAY TREND ANALYSIS, PROTOCOL PRIORITY SCORES, ACTIVE CONSTRAINTS, "
+        "and the nutrition database),\n"
         "generate my full personalized health & lifestyle plan across all 12 sections.\n"
-        "Reference my recent history trends when relevant.\n"
+        "Reference specific trends from the TREND ANALYSIS block by name — "
+        "e.g. 'Your data shows energy declines on Mondays...'\n"
         "Follow PROTOCOL PRIORITY SCORES order — address 🔴 HIGH protocols first.\n"
         "Respect every ACTIVE CONSTRAINT (time, budget, kitchen, diet, allergies).\n"
         "Reference specific real foods from the nutrition database by name and macros.\n"
@@ -748,9 +753,11 @@ def build_full_context(profile: dict, username: str) -> tuple[str, str]:
         prioritized, nutrient_targets, constraint_result
     )
 
-    # ── Stage 5: Session memory ─────────────────────────────────
+    # ── Stage 5: Session memory + Trend Analysis ──────────────
+    from trend_engine import analyze_trends, format_trend_block
     recent_logs = session_memory.load_recent_logs(username)
     memory_ctx  = session_memory.format_memory_context(recent_logs)
+    trend_ctx   = format_trend_block(analyze_trends(recent_logs))
 
     # ── Stage 6: RAG — constrained semantic food retrieval ──────
     # Use constraint graph's typed protocol list as the retrieval signal
@@ -773,7 +780,7 @@ def build_full_context(profile: dict, username: str) -> tuple[str, str]:
     constraint_block = cg.to_prompt_block()
     system_full      = constraint_block + SYSTEM_PROMPT + research_ctx
     seed_message     = profile_to_context(
-        profile, analysis, priority_block, nutrition_ctx, memory_ctx
+        profile, analysis, priority_block, nutrition_ctx, memory_ctx, trend_ctx
     )
 
     return system_full, seed_message
@@ -877,9 +884,13 @@ def main():
             print(f"     • {flag}")
         print("─" * 60)
 
-    # ── Memory context (last 7 days of check-ins) ───────────────────────
+    # ── Memory context + Trend Analysis (last 7 days) ─────────────────
+    from trend_engine import analyze_trends, format_trend_block
     recent_logs   = session_memory.load_recent_logs(user_name)
     memory_ctx    = session_memory.format_memory_context(recent_logs)
+    trend_ctx     = format_trend_block(analyze_trends(recent_logs))
+    if trend_ctx:
+        print(trend_ctx)
 
     # ── RAG: top-15 semantically relevant foods for this user's goals ────
     seed_query    = "personalized health plan " + " ".join(state.get("goals", []))
@@ -899,7 +910,7 @@ def main():
     messages: list[dict] = [{"role": "system", "content": _constraint_block + SYSTEM_PROMPT + research_ctx}]
 
     # Seed with profile + analysis + memory + priority block + RAG nutrition
-    seed_message = profile_to_context(profile, analysis, priority_block, nutrition_ctx, memory_ctx)
+    seed_message = profile_to_context(profile, analysis, priority_block, nutrition_ctx, memory_ctx, trend_ctx)
     messages.append({"role": "user", "content": seed_message})
     print("\n⏳  Generating your personalized plan…\n")
     try:
@@ -968,13 +979,27 @@ def main():
             top_3 = ", ".join(p.replace("_protocol", "") for p, _ in prioritized[:3])
             print(f"  📊  Feedback recorded {feedback} — top protocols: [{top_3}]\n")
 
+        # ── Meal Swap Detection ────────────────────────────────────
+        from meal_swap import detect_swap_request, find_swaps, format_swap_block as _fmt_swap
+        _rejected = detect_swap_request(user_input)
+        _swap_block = ""
+        if _rejected and nutrition_db.is_loaded():
+            _active_protos = [p for p, _ in prioritized[:5]]
+            _swaps = find_swaps(_rejected, constraint_graph=_cg,
+                                active_protocols=_active_protos, n=5)
+            _swap_block = _fmt_swap(_rejected, _swaps, constraint_graph=_cg)
+            if _swaps:
+                print(f"  🔄  Swap engine: {len(_swaps)} substitutes found for '{_rejected}'")
+
         # RAG: fetch foods relevant to this specific follow-up query
         _rag_ctx = rag.query(user_input, [p for p, _ in prioritized[:5]], n=8,
                              constraint_graph=_cg)
         _send    = (
-            f"[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
-            if _rag_ctx else user_input
+            f"{_swap_block}\n\n[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
+            if _rag_ctx or _swap_block else user_input
         )
+        if _swap_block and not _rag_ctx:
+            _send = f"{_swap_block}\n\n{user_input}"
 
         print("\n⏳  Thinking…\n")
         try:

@@ -5,9 +5,6 @@
   padding: 20px 32px;
   background-color: var(--white);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 80px;
-  z-index: 5;
 }
 
 .left {

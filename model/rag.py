@@ -14,12 +14,13 @@ Usage
 
 import os
 import json
+from typing import Any
 
 _MODULE_DIR  = os.path.dirname(os.path.abspath(__file__))
 CHROMA_PATH  = os.path.join(_MODULE_DIR, "chroma_db")
 COLL_NAME    = "health_foods"
 
-_collection:     object = None   # chromadb Collection
+_collection:     Any  = None   # chromadb Collection
 _fallback_index: dict   = {}     # raw nutrition_index.json
 _chroma_ready:   bool   = False
 
@@ -72,7 +73,7 @@ def build(nutrition_index_path: str) -> bool:
     # Build fresh vector store
     try:
         ef  = DefaultEmbeddingFunction()
-        col = client.create_collection(COLL_NAME, embedding_function=ef)
+        col = client.create_collection(COLL_NAME, embedding_function=ef)  # type: ignore[arg-type]
     except Exception:
         return False
 

@@ -35,27 +35,58 @@ from ontology import (
 
 
 # ══════════════════════════════════════════════
+# All animal flesh keywords used across both VEGETARIAN and VEGAN
+# Built from USDA food database common naming patterns
+_ALL_MEAT_KEYWORDS: frozenset[str] = frozenset({
+    # Poultry (domestic + wild)
+    "chicken", "turkey", "duck", "goose", "quail", "pheasant", "cornish",
+    "ptarmigan", "grouse", "owl", "pigeon", "dove",
+    # Red meat (domestic + exotic)
+    "beef", "pork", "lamb", "veal", "mutton", "bison", "buffalo", "venison",
+    "elk", "boar", "rabbit", "horse", "llama", "moose", "caribou",
+    "goat", "muskox", "muskrat", "porcupine", "armadillo",
+    # Deli / processed meat
+    "bacon", "ham", "sausage", "pepperoni", "salami", "prosciutto",
+    "mortadella", "bologna", "bratwurst", "chorizo", "pastrami", "jerky",
+    "kielbasa", "wiener", "frankfurter", "liverwurst",
+    # Marine mammals
+    "seal", "whale", "walrus", "bear", "sea lion",
+    # *** GENERIC ANIMAL KEYWORDS ***
+    "fish", "meat", "seafood", "poultry", "game",
+    # Fish (specific)
+    "salmon", "tuna", "cod", "tilapia", "halibut", "herring", "mackerel",
+    "sardine", "anchovies", "flounder", "trout", "bass", "catfish",
+    "haddock", "snapper", "mahi", "swordfish", "perch", "pollock", "smelt",
+    "walleye", "pike", "carp", "whiting", "sole", "grouper", "pompano",
+    "mullet", "bluefish", "crappie", "sunfish", "eel", "sturgeon",
+    "caviar", "roe", "fillet",
+    # Shellfish & mollusks
+    "shrimp", "prawn", "crab", "lobster", "squid", "octopus",
+    "clam", "oyster", "mussel", "scallop", "abalone", "conch",
+    "chiton", "limpet", "whelk",
+    # Obscure fish common in USDA database
+    "scad", "cisco", "chum", "coho", "sockeye", "chinook", "burbot",
+    "whitefish", "inconnu", "sheefish", "lingcod", "rockfish", "sablefish",
+    "wolffish", "turbot", "plaice", "dab",
+    # Spanish/Portuguese/international animal protein terms (common in USDA DB)
+    "pollo", "carne", "cerdo", "cordero", "ternera", "pescado",
+    "camarones", "atun", "bacalao",
+})
+
 # DIET → FORBIDDEN KEYWORD SET
 # ══════════════════════════════════════════════
 _DIET_FORBIDDEN: dict[DietType, frozenset[str]] = {
-    DietType.VEGETARIAN: frozenset({
-        "chicken", "beef", "pork", "turkey", "salmon", "tuna", "fish",
-        "lamb", "bacon", "shrimp", "crab", "lobster", "venison", "duck",
-        "goose", "ham", "sausage", "pepperoni", "anchovies", "sardine",
-        "tilapia", "cod", "halibut", "herring", "mackerel", "prawn",
-    }),
-    DietType.VEGAN: frozenset({
-        # All meat
-        "chicken", "beef", "pork", "turkey", "salmon", "tuna", "fish",
-        "lamb", "bacon", "shrimp", "crab", "lobster", "venison", "duck",
-        "ham", "sausage", "pepperoni", "anchovies", "sardine",
-        # All animal products
+    DietType.VEGETARIAN: _ALL_MEAT_KEYWORDS,
+    DietType.VEGAN: _ALL_MEAT_KEYWORDS | frozenset({
         "milk", "cheese", "butter", "cream", "yogurt", "whey",
         "egg", "honey", "gelatin", "lard",
     }),
     DietType.PESCATARIAN: frozenset({
-        "chicken", "beef", "pork", "turkey", "lamb", "bacon", "duck",
-        "ham", "sausage", "pepperoni", "venison", "goose",
+        "chicken", "turkey", "duck", "goose", "beef", "pork", "lamb",
+        "veal", "mutton", "bison", "buffalo", "venison", "elk",
+        "bacon", "ham", "sausage", "pepperoni", "salami", "prosciutto",
+        "chorizo", "pastrami", "jerky", "kielbasa",
+        "meat", "poultry",
     }),
     DietType.HALAL: frozenset({
         "pork", "ham", "bacon", "lard", "pepperoni", "gelatin",

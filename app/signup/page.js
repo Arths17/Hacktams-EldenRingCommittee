@@ -2,18 +2,32 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import styles from "./login.module.css";
+import styles from "./signup.module.css";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState(null); // { text, type: "success" | "error" }
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage(null);
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setMessage({ text: "✗ Passwords do not match", type: "error" });
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      setMessage({ text: "✗ Password must be at least 6 characters", type: "error" });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -21,7 +35,7 @@ export default function LoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch("/login", {
+      const response = await fetch("/api/signup", {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -31,10 +45,10 @@ export default function LoginPage() {
 
       if (data.success) {
         localStorage.setItem("token", data.token);
-        setMessage({ text: "✓ Login successful! Redirecting...", type: "success" });
+        setMessage({ text: "✓ Account created! Redirecting to dashboard...", type: "success" });
         setTimeout(() => router.push("/dashboard"), 1000);
       } else {
-        setMessage({ text: "✗ Invalid username or password. Please try again.", type: "error" });
+        setMessage({ text: `✗ ${data.error || "Could not create account"}`, type: "error" });
       }
     } catch {
       setMessage({ text: "✗ Could not reach the server. Please try again.", type: "error" });
@@ -52,8 +66,8 @@ export default function LoginPage() {
           <span className={styles.brandName}>CampusFuel</span>
         </div>
 
-        <h1 className={styles.title}>Welcome back</h1>
-        <p className={styles.subtitle}>Sign in to your account</p>
+        <h1 className={styles.title}>Create your account</h1>
+        <p className={styles.subtitle}>Join CampusFuel to track your nutrition</p>
 
         {message && (
           <div className={`${styles.message} ${styles[message.type]}`}>
@@ -67,12 +81,13 @@ export default function LoginPage() {
             <input
               id="username"
               type="text"
-              placeholder="Enter your username"
+              placeholder="Choose a username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className={styles.input}
               required
               autoComplete="username"
+              minLength={3}
             />
           </div>
 
@@ -81,23 +96,38 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="Create a password (min. 6 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={styles.input}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
+              minLength={6}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="confirmPassword" className={styles.label}>Confirm Password</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={styles.input}
+              required
+              autoComplete="new-password"
             />
           </div>
 
           <button type="submit" className={styles.btn} disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Creating account..." : "Sign Up"}
           </button>
         </form>
 
         <p className={styles.footer}>
-          Don&apos;t have an account?{" "}
-          <a href="/signup" className={styles.link}>Sign up</a>
+          Already have an account?{" "}
+          <a href="/login" className={styles.link}>Sign in</a>
         </p>
       </div>
     </div>
