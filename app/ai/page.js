@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "../components/Sidebar/Sidebar";
+import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import styles from "./ai.module.css";
 
 export default function AIPage() {
@@ -115,7 +115,7 @@ export default function AIPage() {
   if (!profileReady) {
     return (
       <div className={styles.layout}>
-        <Sidebar />
+        <CampusFuelNav />
         <div className={styles.main}>
           <div className={styles.gateWrap}>
             <div className={styles.gateCard}>
@@ -143,7 +143,7 @@ export default function AIPage() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar />
+      <CampusFuelNav />
       <div className={styles.main}>
         {/* Header */}
         <div className={styles.header}>
