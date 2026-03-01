@@ -297,6 +297,14 @@
   font-weight: 500;
 }
 
+.waterTip {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 6px;
+  opacity: 0.7;
+}
+
 /* Tips */
 .tips {
   display: flex;

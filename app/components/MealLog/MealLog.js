@@ -59,7 +59,7 @@ export default function MealLog() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>Today&apos;s Meal Log</h2>
-        <button className={styles.addBtn}>+ Add Meal</button>
+        <a href="/meals" className={styles.addBtn}>+ Add Meal</a>
       </div>
       <div className={styles.list}>
         {meals.map((meal) => (

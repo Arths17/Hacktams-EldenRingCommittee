@@ -1129,6 +1129,253 @@ async def chat(request: Request):
         )
 
 # ══════════════════════════════════════════════
+# NUTRITION ENDPOINTS
+# ══════════════════════════════════════════════
+
+@app.get(
+    "/api/nutrition/search",
+    tags=["Nutrition"],
+    summary="Search nutrition database",
+    description="Search for foods in the nutrition database",
+)
+async def search_nutrition(request: Request, q: str):
+    """Search nutrition database by food name."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        if not q or len(q) < 2:
+            return JSONResponse(
+                {"success": False, "error": "Query must be at least 2 characters", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+        
+        try:
+            from model import nutrition_db
+            
+            if not nutrition_db.is_loaded():
+                return JSONResponse(
+                    {"success": False, "error": "Nutrition database not loaded", "error_code": "SERVICE_UNAVAILABLE"},
+                    status_code=503,
+                )
+            
+            # Search using fuzzy search
+            results = nutrition_db.fuzzy_search(q, top_n=10)
+            
+            return JSONResponse({
+                "success": True,
+                "results": results,
+                "count": len(results)
+            })
+        
+        except Exception as e:
+            logger.error(f"Nutrition search error: {e}", exc_info=True)
+            return JSONResponse(
+                {"success": False, "error": "Search failed", "error_code": "SEARCH_ERROR"},
+                status_code=500,
+            )
+    
+    except Exception as e:
+        logger.error(f"Nutrition endpoint error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+@app.get(
+    "/api/nutrition/food/{food_name}",
+    tags=["Nutrition"],
+    summary="Get food details",
+    description="Get detailed nutrition information for a specific food",
+)
+async def get_food_details(food_name: str, request: Request):
+    """Get detailed nutrition info for a specific food."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        try:
+            from model import nutrition_db
+            
+            if not nutrition_db.is_loaded():
+                return JSONResponse(
+                    {"success": False, "error": "Nutrition database not loaded", "error_code": "SERVICE_UNAVAILABLE"},
+                    status_code=503,
+                )
+            
+            # Get food by name using lookup
+            food = nutrition_db.lookup(food_name)
+            
+            if not food:
+                return JSONResponse(
+                    {"success": False, "error": "Food not found", "error_code": "NOT_FOUND"},
+                    status_code=404,
+                )
+            
+            return JSONResponse({
+                "success": True,
+                "food": food
+            })
+        
+        except Exception as e:
+            logger.error(f"Food details error: {e}", exc_info=True)
+            return JSONResponse(
+                {"success": False, "error": "Failed to get food details", "error_code": "FETCH_ERROR"},
+                status_code=500,
+            )
+    
+    except Exception as e:
+        logger.error(f"Food details endpoint error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+# ══════════════════════════════════════════════
+# MEALS LOGGING ENDPOINTS
+# ══════════════════════════════════════════════
+
+@app.post(
+    "/api/meals",
+    tags=["Meals"],
+    summary="Log a meal",
+    description="Log a new meal with food items and nutritional information",
+)
+async def log_meal(request: Request):
+    """Log a new meal."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        
+        data = await request.json()
+        
+        # Validate data
+        if not data.get("type") or not data.get("items"):
+            return JSONResponse(
+                {"success": False, "error": "Missing required fields: type, items", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+        
+        # Add timestamp if not provided
+        if "timestamp" not in data:
+            data["timestamp"] = datetime.utcnow().isoformat()
+        
+        # Store in Supabase or local file
+        if USE_SUPABASE and user_id:
+            try:
+                _sb.table("meals").insert({
+                    **data,
+                    "user_id": user_id,
+                }).execute()
+                logger.info(f"✓ Meal logged: {username} (Supabase)")
+                return JSONResponse({"success": True})
+            except Exception as e:
+                logger.warning(f"Supabase meal log failed: {e}, falling back to local")
+        
+        # Fallback to local storage
+        meals_path = _profile_path(username).replace(".json", "_meals.json")
+        try:
+            with open(meals_path, "r") as f:
+                meals = json.load(f)
+        except FileNotFoundError:
+            meals = []
+        
+        meals.append(data)
+        
+        with open(meals_path, "w") as f:
+            json.dump(meals, f, indent=2)
+        
+        logger.info(f"✓ Meal logged: {username} (local)")
+        return JSONResponse({"success": True})
+    
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Meal logging error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+@app.get(
+    "/api/meals",
+    tags=["Meals"],
+    summary="Get user meals",
+    description="Get all meals logged by the authenticated user",
+)
+async def get_meals(request: Request, date: Optional[str] = None):
+    """Get user's logged meals."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        
+        # Try Supabase first
+        if USE_SUPABASE and user_id:
+            try:
+                query = _sb.table("meals").select("*").eq("user_id", user_id)
+                if date:
+                    query = query.eq("date", date)
+                res = query.execute()
+                return JSONResponse({
+                    "success": True,
+                    "meals": res.data or []
+                })
+            except Exception as e:
+                logger.warning(f"Supabase meals fetch failed: {e}")
+        
+        # Fallback to local
+        meals_path = _profile_path(username).replace(".json", "_meals.json")
+        try:
+            with open(meals_path, "r") as f:
+                meals = json.load(f)
+            
+            # Filter by date if provided
+            if date:
+                meals = [m for m in meals if m.get("date") == date]
+            
+            return JSONResponse({
+                "success": True,
+                "meals": meals
+            })
+        except FileNotFoundError:
+            return JSONResponse({
+                "success": True,
+                "meals": []
+            })
+    
+    except Exception as e:
+        logger.error(f"Get meals error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+# ══════════════════════════════════════════════
 # APP STARTUP/SHUTDOWN
 # ══════════════════════════════════════════════
 

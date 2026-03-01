@@ -8,6 +8,8 @@ import StatsCard from "../components/StatsCard/StatsCard";
 import MealLog from "../components/MealLog/MealLog";
 import styles from "./dashboard.module.css";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 const stats = [
   { label: "Calories", value: "1,900", unit: "kcal", icon: "🔥", progress: 79, color: "green" },
   { label: "Protein", value: "108", unit: "g", icon: "💪", progress: 86, color: "gold" },
@@ -25,11 +27,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const [username, setUsername] = useState(null);
   const [profile, setProfile] = useState({});
+  const [waterGlasses, setWaterGlasses] = useState(6); // Track water intake
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
-    fetch("/api/me", {
+    fetch(`${API_BASE_URL}/api/me`, {
       headers: { "Authorization": `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -42,7 +45,26 @@ export default function DashboardPage() {
         }
       })
       .catch(() => router.push("/login"));
-  }, []);
+      
+    // Load water intake from localStorage
+    const savedWater = localStorage.getItem("waterIntake");
+    if (savedWater) {
+      setWaterGlasses(parseInt(savedWater));
+    }
+  }, [router]);
+
+  const toggleWaterGlass = (index) => {
+    let newWaterCount;
+    if (index < waterGlasses) {
+      // Clicking a filled glass - unfill from that point
+      newWaterCount = index;
+    } else {
+      // Clicking an empty glass - fill up to that point
+      newWaterCount = index + 1;
+    }
+    setWaterGlasses(newWaterCount);
+    localStorage.setItem("waterIntake", newWaterCount.toString());
+  };
 
   const displayName = profile.name || username || "there";
   const hour = new Date().getHours();
@@ -93,12 +115,18 @@ export default function DashboardPage() {
                 <h3 className={styles.cardTitle}>💧 Hydration</h3>
                 <div className={styles.waterGlasses}>
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className={`${styles.glass} ${i < 6 ? styles.filled : ""}`}>
+                    <div 
+                      key={i} 
+                      className={`${styles.glass} ${i < waterGlasses ? styles.filled : ""}`}
+                      onClick={() => toggleWaterGlass(i)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       💧
                     </div>
                   ))}
                 </div>
-                <p className={styles.waterText}>6 / 8 glasses</p>
+                <p className={styles.waterText}>{waterGlasses} / 8 glasses</p>
+                <p className={styles.waterTip}>Click to track your water intake!</p>
               </div>
 
               {/* Tips */}

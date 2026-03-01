@@ -1,0 +1,408 @@
+/* Nutrition Page Styles */
+
+.layout {
+  position: relative;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+  overflow-x: hidden;
+}
+
+.orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.orbGreen {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #00d084, transparent);
+  top: -100px;
+  right: -100px;
+}
+
+.orbGold {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #f4b942, transparent);
+  bottom: -150px;
+  left: -150px;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  padding-top: 80px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.content {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Goals Card */
+.goalsCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.goalsTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.goalsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+}
+
+.goalItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.goalIcon {
+  font-size: 2rem;
+}
+
+.goalLabel {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.goalValue {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #00d084;
+}
+
+/* Search Card */
+.searchCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.searchTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.searchForm {
+  display: flex;
+  gap: 1rem;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.searchInput:focus {
+  border-color: #00d084;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.searchButton {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #00d084, #00a86b);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.searchButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 208, 132, 0.3);
+}
+
+.searchButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Results Card */
+.resultsCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.resultsTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.resultItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #00d084;
+  transform: translateY(-2px);
+}
+
+.resultMain {
+  flex: 1;
+}
+
+.resultName {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.resultCategory {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.resultNutrients {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.nutrientBadge {
+  padding: 0.5rem 1rem;
+  background: rgba(0, 208, 132, 0.1);
+  border: 1px solid rgba(0, 208, 132, 0.3);
+  border-radius: 8px;
+  color: #00d084;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.viewButton {
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 208, 132, 0.1);
+  border: 1px solid #00d084;
+  border-radius: 8px;
+  color: #00d084;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.viewButton:hover {
+  background: rgba(0, 208, 132, 0.2);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.modalContent {
+  background: linear-gradient(135deg, #1a2332 0%, #2a3442 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 2.5rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modalClose {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modalClose:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.modalTitle {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.modalCategory {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 2rem;
+}
+
+.nutrientDetails {
+  margin-top: 1.5rem;
+}
+
+.detailsSubtitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.nutrientGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nutrientRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.nutrientName {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.nutrientValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #00d084;
+}
+
+/* Tips Card */
+.tipsCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.tipsTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.tipsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tip {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.tipIcon {
+  font-size: 1.5rem;
+}
+
+.tipText {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: 1rem;
+  }
+  
+  .goalsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .searchForm {
+    flex-direction: column;
+  }
+  
+  .resultItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .resultNutrients {
+    width: 100%;
+  }
+}

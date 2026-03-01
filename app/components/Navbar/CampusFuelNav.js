@@ -16,9 +16,9 @@ export default function CampusFuelNav() {
           <a href="/dashboard">Dashboard</a>
           <a href="/ai">AI Coach</a>
           <a href="/survey">Survey</a>
-          <a href="#">Nutrition</a>
-          <a href="#">Progress</a>
-          <a href="#">Meals</a>
+          <a href="/nutrition">Nutrition</a>
+          <a href="/progress">Progress</a>
+          <a href="/meals">Meals</a>
         </nav>
 
         {/* Right: actions */}
