@@ -21,7 +21,7 @@ export default function LoginPage() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch("http://127.0.0.1:8000/login", {
+      const response = await fetch("/login", {
         method: "POST",
         credentials: "include",
         body: formData,
