@@ -86,9 +86,9 @@ const STEPS = [
   {
     key: "class_schedule",
     emoji: "📅",
-    question: "What days do you have class?",
-    type: "daypicker",
-    hint: "Tap all days you have classes",
+    question: "What's your class schedule?",
+    type: "classpicker",
+    times: ["6am","7am","8am","9am","10am","11am","12pm","1pm","2pm","3pm","4pm","5pm","6pm","7pm","8pm","9pm"],
   },
   {
     key: "sleep_schedule",
@@ -161,6 +161,11 @@ export default function SurveyPage() {
   // workoutpicker state
   const [workoutDays, setWorkoutDays] = useState([]);
   const [workoutSlot, setWorkoutSlot] = useState("");
+  // classpicker state
+  const [classBlocks, setClassBlocks] = useState([]); // [{days:[], start:"", end:""}]
+  const [blockDays, setBlockDays] = useState([]);
+  const [blockStart, setBlockStart] = useState("");
+  const [blockEnd, setBlockEnd] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -170,7 +175,11 @@ export default function SurveyPage() {
   function handleNext() {
     // Serialize interactive pickers into a string value
     let val = current.trim();
-    if (q.type === "daypicker") {
+    if (q.type === "classpicker") {
+      val = classBlocks.length > 0
+        ? classBlocks.map(b => `${b.days.join(", ")} ${b.start}–${b.end}`).join(" | ")
+        : "";
+    } else if (q.type === "daypicker") {
       val = selectedDays.length > 0 ? selectedDays.join(", ") : "";
     } else if (q.type === "sleeppicker") {
       val = bedTime && wakeTime ? `sleep ${bedTime} for ${wakeTime}` : "";
@@ -185,7 +194,8 @@ export default function SurveyPage() {
       return;
     }
     setError("");
-    const updated = { ...answers, [q.key]: val.toLowerCase() };
+    // Don't lowercase classpicker (preserves day names like Mon, Tue)
+    const updated = { ...answers, [q.key]: q.type === "classpicker" ? val : val.toLowerCase() };
     setAnswers(updated);
 
     if (isLast) {
@@ -194,7 +204,17 @@ export default function SurveyPage() {
       const nextKey = STEPS[step + 1].key;
       const nextType = STEPS[step + 1].type;
       const saved = updated[nextKey] || "";
-      if (nextType === "daypicker") {
+      if (nextType === "classpicker") {
+        if (saved) {
+          const blocks = saved.split(" | ").map(b => {
+            const i = b.lastIndexOf(" ");
+            const [s, e] = b.substring(i + 1).split("–");
+            return { days: b.substring(0, i).split(", "), start: s, end: e };
+          });
+          setClassBlocks(blocks);
+        } else { setClassBlocks([]); }
+        setBlockDays([]); setBlockStart(""); setBlockEnd("");
+      } else if (nextType === "daypicker") {
         setSelectedDays(saved ? saved.split(", ") : []);
       } else if (nextType === "sleeppicker") {
         const m = saved.match(/sleep (.+) for (.+)/);
@@ -218,7 +238,17 @@ export default function SurveyPage() {
     const prevKey = STEPS[step - 1].key;
     const prevType = STEPS[step - 1].type;
     const saved = answers[prevKey] || "";
-    if (prevType === "daypicker") {
+    if (prevType === "classpicker") {
+      if (saved) {
+        const blocks = saved.split(" | ").map(b => {
+          const i = b.lastIndexOf(" ");
+          const [s, e] = b.substring(i + 1).split("–");
+          return { days: b.substring(0, i).split(", "), start: s, end: e };
+        });
+        setClassBlocks(blocks);
+      } else { setClassBlocks([]); }
+      setBlockDays([]); setBlockStart(""); setBlockEnd("");
+    } else if (prevType === "daypicker") {
       setSelectedDays(saved ? saved.split(", ") : []);
     } else if (prevType === "sleeppicker") {
       const m = saved.match(/sleep (.+) for (.+)/);
@@ -362,26 +392,80 @@ export default function SurveyPage() {
             </div>
           )}
 
-          {q.type === "daypicker" && (
+          {q.type === "classpicker" && (
             <div className={styles.pickerWrap}>
-              <p className={styles.pickerHint}>{q.hint}</p>
-              <div className={styles.dayRow}>
-                {DAYS.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={`${styles.dayBtn} ${selectedDays.includes(d) ? styles.dayBtnOn : ""}`}
-                    onClick={() => setSelectedDays((prev) =>
-                      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-              {selectedDays.length > 0 && (
-                <p className={styles.pickerSummary}>📅 {selectedDays.join(" · ")}</p>
+              {/* Saved class blocks */}
+              {classBlocks.length > 0 && (
+                <div className={styles.classBlockList}>
+                  {classBlocks.map((b, i) => (
+                    <div key={i} className={styles.classBlock}>
+                      <span>📅 {b.days.join(" · ")} &nbsp;·&nbsp; {b.start}–{b.end}</span>
+                      <button type="button" className={styles.classBlockRemove}
+                        onClick={() => setClassBlocks(prev => prev.filter((_, j) => j !== i))}>
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {/* Builder */}
+              <div className={styles.classBuilder}>
+                <p className={styles.sleepLabel}>📆 Days</p>
+                <div className={styles.dayRow}>
+                  {DAYS.map((d) => (
+                    <button key={d} type="button"
+                      className={`${styles.dayBtn} ${blockDays.includes(d) ? styles.dayBtnOn : ""}`}
+                      onClick={() => setBlockDays(prev =>
+                        prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]
+                      )}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.sleepRow}>
+                  <div className={styles.sleepGroup}>
+                    <span className={styles.sleepLabel}>🕐 Start time</span>
+                    <div className={styles.timeGrid}>
+                      {q.times.map(t => (
+                        <button key={t} type="button"
+                          className={`${styles.timeBtn} ${blockStart === t ? styles.timeBtnOn : ""}`}
+                          onClick={() => {
+                            setBlockStart(t);
+                            if (blockEnd && q.times.indexOf(t) >= q.times.indexOf(blockEnd)) setBlockEnd("");
+                          }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className={styles.sleepDivider} />
+                  <div className={styles.sleepGroup}>
+                    <span className={styles.sleepLabel}>🕑 End time</span>
+                    <div className={styles.timeGrid}>
+                      {q.times
+                        .filter(t => !blockStart || q.times.indexOf(t) > q.times.indexOf(blockStart))
+                        .map(t => (
+                          <button key={t} type="button"
+                            className={`${styles.timeBtn} ${blockEnd === t ? styles.timeBtnOn : ""}`}
+                            onClick={() => setBlockEnd(t)}>
+                            {t}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={styles.addClassBtn}
+                  disabled={blockDays.length === 0 || !blockStart || !blockEnd}
+                  onClick={() => {
+                    setClassBlocks(prev => [...prev, { days: blockDays, start: blockStart, end: blockEnd }]);
+                    setBlockDays([]); setBlockStart(""); setBlockEnd("");
+                  }}>
+                  + Add Class
+                </button>
+              </div>
             </div>
           )}
 
