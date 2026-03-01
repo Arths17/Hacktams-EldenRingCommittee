@@ -164,3 +164,33 @@
   color: var(--gold-light);
   transform: translateY(-1px);
 }
+
+/* Explicit link class (mirrors .navLinks a) */
+.navLink {
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Active page highlight */
+.navLinkActive {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  font-weight: 700 !important;
+}
+
+.btnAiActive {
+  background: rgba(201, 155, 76, 0.28) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold-light) !important;
+}

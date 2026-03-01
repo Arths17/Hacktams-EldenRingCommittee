@@ -583,14 +583,14 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   font-family: inherit;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
 .btnCtaWhite:hover {
-  opacity: 0.92;
-  box-shadow: 0 6px 28px rgba(0,0,0,0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
 }
 
 /* ── Footer ───────────────────────────────────────────── */

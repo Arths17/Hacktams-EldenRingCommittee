@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./login.module.css";
@@ -19,6 +19,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(null); // { text, type: "success" | "error" }
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (token) router.push("/dashboard");
+  }, [router]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -33,13 +40,19 @@ export default function LoginPage() {
       const response = await fetch("/api/login", {
         method: "POST",
         credentials: "include",
+        headers: { "ngrok-skip-browser-warning": "true" },
         body: formData,
       });
 
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem("token", data.token);
+        if (rememberMe) {
+          localStorage.setItem("token", data.token);
+        } else {
+          sessionStorage.setItem("token", data.token);
+          localStorage.removeItem("token");
+        }
         // Clear old profile cache to prevent account mix-ups
         localStorage.removeItem("campusfuel_profile");
         setMessage({ text: "✓ Login successful! Redirecting...", type: "success" });
@@ -121,6 +134,19 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
             />
+          </div>
+
+          <div className={styles.rememberRow}>
+            <input
+              id="rememberMe"
+              type="checkbox"
+              className={styles.checkbox}
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <label htmlFor="rememberMe" className={styles.checkLabel}>
+              Remember me
+            </label>
           </div>
 
           <button type="submit" className={styles.btn} disabled={loading}>

@@ -1,6 +1,6 @@
 import styles from "./StatsCard.module.css";
 
-export default function StatsCard({ label, value, unit, icon, progress, color = "green" }) {
+export default function StatsCard({ label, value, unit, icon, progress, color = "green", goalText }) {
   return (
     <div className={`${styles.card} ${styles[color]}`}>
       <div className={styles.top}>
@@ -10,6 +10,7 @@ export default function StatsCard({ label, value, unit, icon, progress, color = 
           <span className={styles.value}>
             {value}
             <span className={styles.unit}>{unit}</span>
+            {goalText && <span className={styles.goalText}>{goalText}</span>}
           </span>
         </div>
       </div>

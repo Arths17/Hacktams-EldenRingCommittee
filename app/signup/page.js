@@ -48,6 +48,7 @@ export default function SignupPage() {
       const response = await fetch("/api/signup", {
         method: "POST",
         credentials: "include",
+        headers: { "ngrok-skip-browser-warning": "true" },
         body: formData,
       });
 
@@ -57,8 +58,8 @@ export default function SignupPage() {
         localStorage.setItem("token", data.token);
         // Clear old profile cache from previous accounts
         localStorage.removeItem("campusfuel_profile");
-        setMessage({ text: "✓ Account created! Redirecting to dashboard...", type: "success" });
-        setTimeout(() => router.push("/dashboard"), 1000);
+        setMessage({ text: "✓ Account created! Let's set up your profile...", type: "success" });
+        setTimeout(() => router.push("/survey"), 1000);
       } else {
         setMessage({ text: `✗ ${data.error || "Could not create account"}`, type: "error" });
       }

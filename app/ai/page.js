@@ -43,10 +43,10 @@ class TimeoutError extends APIError {
   }
 }
 
-// Get auth token from localStorage
+// Get auth token from localStorage or sessionStorage
 function getAuthToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
 }
 
 // Fetch with timeout
@@ -83,6 +83,7 @@ async function getProfile() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
       },
     });
 
@@ -119,6 +120,7 @@ async function sendChatMessage(message, onChunk) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ message }),
       signal: controller.signal,
@@ -159,6 +161,77 @@ async function sendChatMessage(message, onChunk) {
     if (error instanceof APIError) throw error;
     throw new NetworkError(`Chat failed: ${error.message}`);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MARKDOWN RENDERER
+// ═══════════════════════════════════════════════════════════════════
+
+function renderInline(text) {
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let key = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    if (match[2]) parts.push(<strong key={key++}>{match[2]}</strong>);
+    else if (match[3]) parts.push(<em key={key++}>{match[3]}</em>);
+    else if (match[4]) parts.push(<code key={key++} style={{ background: "rgba(0,0,0,0.07)", padding: "1px 5px", borderRadius: "4px", fontSize: "0.88em", fontFamily: "monospace" }}>{match[4]}</code>);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts.length > 0 ? parts : text;
+}
+
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const elements = [];
+  let listItems = [];
+  let listType = null;
+  function flushList() {
+    if (!listItems.length) return;
+    const Tag = listType === "ol" ? "ol" : "ul";
+    elements.push(
+      <Tag key={`list-${elements.length}`} style={{ paddingLeft: "1.4em", margin: "4px 0" }}>
+        {listItems.map((item, i) => <li key={i} style={{ marginBottom: "2px" }}>{renderInline(item)}</li>)}
+      </Tag>
+    );
+    listItems = [];
+    listType = null;
+  }
+  lines.forEach((line, i) => {
+    const h3 = line.match(/^###\s+(.+)$/);
+    const h2 = line.match(/^##\s+(.+)$/);
+    const h1 = line.match(/^#\s+(.+)$/);
+    const ol = line.match(/^\d+\.\s+(.+)$/);
+    const ul = line.match(/^[-*]\s+(.+)$/);
+    if (h3) {
+      flushList();
+      elements.push(<strong key={i} style={{ display: "block", fontSize: "0.95em", color: "var(--green-dark,#0e3e23)", margin: "8px 0 4px" }}>{renderInline(h3[1])}</strong>);
+    } else if (h2) {
+      flushList();
+      elements.push(<strong key={i} style={{ display: "block", fontSize: "1em", color: "var(--green-dark,#0e3e23)", margin: "10px 0 4px" }}>{renderInline(h2[1])}</strong>);
+    } else if (h1) {
+      flushList();
+      elements.push(<strong key={i} style={{ display: "block", fontSize: "1.05em", color: "var(--green-dark,#0e3e23)", margin: "12px 0 6px" }}>{renderInline(h1[1])}</strong>);
+    } else if (ol) {
+      if (listType !== "ol") { flushList(); listType = "ol"; }
+      listItems.push(ol[1]);
+    } else if (ul) {
+      if (listType !== "ul") { flushList(); listType = "ul"; }
+      listItems.push(ul[1]);
+    } else if (line.trim() === "") {
+      flushList();
+      if (elements.length > 0) elements.push(<br key={`br-${i}`} />);
+    } else {
+      flushList();
+      elements.push(<p key={i} style={{ margin: "0 0 4px" }}>{renderInline(line)}</p>);
+    }
+  });
+  flushList();
+  return elements;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -404,12 +477,9 @@ export default function AIPage() {
                 className={`${styles.bubble} ${msg.role === "user" ? styles.userBubble : styles.aiBubble} ${msg.error ? styles.errorBubble : ""}`}
               >
                 {msg.content
-                  ? msg.content.split("\n").map((line, j) => (
-                      <span key={j}>
-                        {line}
-                        {j < msg.content.split("\n").length - 1 && <br />}
-                      </span>
-                    ))
+                  ? msg.role === "user"
+                    ? msg.content
+                    : renderMarkdown(msg.content)
                   : <span className={styles.typing}>●●●</span>}
               </div>
             </div>
@@ -438,6 +508,11 @@ export default function AIPage() {
             </button>
           </div>
         </div>
+        {/* Page Footer */}
+        <footer className={styles.pageFooter}>
+          <span>🌿 CampusFuel</span>
+          <span>© 2026 · Built for students, by students.</span>
+        </footer>
       </div>
     </div>
   );

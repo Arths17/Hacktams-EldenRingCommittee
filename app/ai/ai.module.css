@@ -501,3 +501,17 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ── Page Footer ─────────────────────────────── */
+.pageFooter {
+  flex-shrink: 0;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: rgba(248, 243, 231, 0.7);
+  backdrop-filter: blur(8px);
+}

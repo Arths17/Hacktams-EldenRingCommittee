@@ -1,30 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    // In production (Vercel), API routes are handled by vercel.json routing
-    // In development, proxy to local FastAPI server
-    const isDev = process.env.NODE_ENV !== 'production';
-    
-    if (!isDev) {
-      return [];
-    }
-    
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     return [
       {
         source: '/api/login',
-        destination: 'http://localhost:8000/login',
+        destination: `${backendUrl}/login`,
       },
       {
         source: '/login',
-        destination: 'http://localhost:8000/login',
+        destination: `${backendUrl}/login`,
       },
       {
         source: '/api/signup',
-        destination: 'http://localhost:8000/api/signup',
+        destination: `${backendUrl}/api/signup`,
       },
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

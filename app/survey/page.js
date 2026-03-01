@@ -154,7 +154,6 @@ export default function SurveyPage() {
 
   const q = STEPS[step];
   const isLast = step === STEPS.length - 1;
-  const progress = Math.round(((step) / STEPS.length) * 100);
 
   function handleNext() {
     const val = current.trim() || (q.type === "slider" ? "5" : "");
@@ -186,7 +185,7 @@ export default function SurveyPage() {
   async function submitProfile(profile) {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         router.push("/login");
         return;
@@ -197,6 +196,7 @@ export default function SurveyPage() {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify(profile),
       });
@@ -232,9 +232,14 @@ export default function SurveyPage() {
         <span className={styles.stepCount}>{step + 1} / {STEPS.length}</span>
       </div>
 
-      {/* Progress bar */}
-      <div className={styles.progressTrack}>
-        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+      {/* Pill progress bar */}
+      <div className={styles.pillBar}>
+        {STEPS.map((_, i) => (
+          <div
+            key={i}
+            className={`${styles.pill} ${i < step ? styles.pillDone : ""} ${i === step ? styles.pillActive : ""}`}
+          />
+        ))}
       </div>
 
       <div className={styles.card}>
@@ -325,15 +330,6 @@ export default function SurveyPage() {
         </div>
       </div>
 
-      {/* Step dots */}
-      <div className={styles.dots}>
-        {STEPS.map((_, i) => (
-          <div
-            key={i}
-            className={`${styles.dot} ${i === step ? styles.dotActive : ""} ${i < step ? styles.dotDone : ""}`}
-          />
-        ))}
-      </div>
     </div>
   );
 }
