@@ -14,6 +14,7 @@ import os
 import re
 import json
 import difflib
+from typing import Optional, List, Dict, Tuple
 
 INDEX_PATH = os.path.join(os.path.dirname(__file__), "nutrition_index.json")
 
@@ -149,7 +150,7 @@ def parse_serving_grams(serving_str: str, food_name: str = "") -> float:
     return TYPICAL_PORTIONS["default"]
 
 
-def scale_to_portion(record: dict, portion_g: float | None = None) -> dict:
+def scale_to_portion(record: dict, portion_g: Optional[float] = None) -> dict:
     """
     Return a new record with every numeric nutrient scaled from per-100g
     to the food's actual serving size (or a custom portion_g override).
@@ -198,7 +199,7 @@ NUTRIENT_PROTOCOL_MAP: dict[str, str] = {
 }
 
 # Map: user profile state → likely nutrient deficiency keys
-STATE_DEFICIENCY_MAP: dict[str, list[str]] = {
+STATE_DEFICIENCY_MAP: Dict[str, List[str]] = {
     "low_energy":    ["iron_mg", "vitamin_b12_ug", "vitamin_b6_mg", "protein_g"],
     "high_stress":   ["magnesium_mg", "vitamin_c_mg", "vitamin_b6_mg"],
     "poor_sleep":    ["tryptophan_mg", "magnesium_mg"],
@@ -209,7 +210,7 @@ STATE_DEFICIENCY_MAP: dict[str, list[str]] = {
 }
 
 
-def user_protocol_gaps(profile: dict) -> dict[str, str]:
+def user_protocol_gaps(profile: dict) -> Dict[str, str]:
     """
     Infer which nutrient protocols the user needs most,
     based on their reported state and goals.
@@ -230,7 +231,7 @@ def user_protocol_gaps(profile: dict) -> dict[str, str]:
     goal    = profile.get("goal", "general health").lower()
 
     # Collect active states
-    active_states: list[str] = []
+    active_states: List[str] = []
     if energy <= 4:   active_states.append("low_energy")
     if stress >= 7:   active_states.append("high_stress")
     if sleep_q == "poor": active_states.append("poor_sleep")
@@ -241,7 +242,7 @@ def user_protocol_gaps(profile: dict) -> dict[str, str]:
 
     # Map states → deficient nutrients → protocols
     protocols: dict[str, str] = {}
-    nutrient_reasons: dict[str, list[str]] = {}
+    nutrient_reasons: Dict[str, List[str]] = {}
     for state in active_states:
         for nutrient in STATE_DEFICIENCY_MAP.get(state, []):
             protocol = NUTRIENT_PROTOCOL_MAP.get(nutrient)
@@ -282,12 +283,12 @@ def meta() -> dict:
     return _db.get("meta", {})
 
 
-def lookup(name: str) -> dict | None:
+def lookup(name: str) -> Optional[dict]:
     """Exact case-insensitive food lookup (returns per-100g record)."""
     return _db.get("foods", {}).get(name.lower().strip())
 
 
-def lookup_scaled(name: str, portion_g: float | None = None) -> dict | None:
+def lookup_scaled(name: str, portion_g: Optional[float] = None) -> Optional[dict]:
     """Lookup and immediately scale to serving portion."""
     rec = lookup(name)
     return scale_to_portion(rec, portion_g) if rec else None
@@ -558,13 +559,13 @@ def meta() -> dict:
 # ──────────────────────────────────────────────
 # LOOKUP
 # ──────────────────────────────────────────────
-def lookup(name: str) -> dict | None:
+def lookup(name: str) -> Optional[dict]:
     """Exact (case-insensitive) food lookup."""
     foods = _db.get("foods", {})
     return foods.get(name.lower().strip())
 
 
-def fuzzy_search(query: str, top_n: int = 5) -> list[dict]:
+def fuzzy_search(query: str, top_n: int = 5) -> List[dict]:
     """Fuzzy search — returns list of matching food records."""
     foods = _db.get("foods", {})
     keys = list(foods.keys())
