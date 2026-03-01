@@ -75,6 +75,14 @@
   margin-left: 3px;
 }
 
+.goalText {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 4px;
+  opacity: 0.75;
+}
+
 .progressTrack {
   height: 6px;
   background: var(--cream);
