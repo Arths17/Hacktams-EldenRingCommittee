@@ -443,6 +443,170 @@
   cursor: not-allowed;
 }
 
+/* ── Day / Time / Sleep pickers ───────────────────────── */
+.pickerWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.pickerHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pickerSummary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(20, 90, 50, 0.08);
+  border: 1px solid rgba(20, 90, 50, 0.15);
+  border-radius: 10px;
+  padding: 8px 14px;
+  text-align: center;
+  animation: fadeUp 0.3s ease both;
+}
+
+/* Day toggle buttons (Mon–Sun) */
+.dayRow {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dayBtn {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: var(--cream);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.dayBtn:hover {
+  border-color: var(--green);
+  color: var(--green);
+  transform: translateY(-2px);
+}
+
+.dayBtnOn {
+  background: var(--green) !important;
+  border-color: var(--green) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(20, 90, 50, 0.25);
+  transform: translateY(-2px);
+}
+
+.dayBtnDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sleep time picker */
+.sleepRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sleepGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.sleepLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.sleepDivider {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+  margin: 4px 0;
+}
+
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.timeBtn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--cream);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.timeBtn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.timeBtnOn {
+  background: var(--green) !important;
+  border-color: var(--green) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(20, 90, 50, 0.2);
+}
+
+/* Workout slot buttons */
+.slotRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.slotBtn {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--cream);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.slotBtn:hover {
+  border-color: var(--gold);
+  color: var(--gold-dark);
+}
+
+.slotBtnOn {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(201, 155, 76, 0.25);
+}
+
 /* Step dots */
 .dots {
   display: flex;

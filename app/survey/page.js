@@ -144,11 +144,22 @@ const STEPS = [
   },
 ];
 
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const WORKOUT_SLOTS = ["Morning","Afternoon","Evening","Night","I don't work out"];
+
 export default function SurveyPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [current, setCurrent] = useState("");
+  // daypicker state: array of selected day strings
+  const [selectedDays, setSelectedDays] = useState([]);
+  // sleeppicker state
+  const [bedTime, setBedTime] = useState("");
+  const [wakeTime, setWakeTime] = useState("");
+  // workoutpicker state
+  const [workoutDays, setWorkoutDays] = useState([]);
+  const [workoutSlot, setWorkoutSlot] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -156,9 +167,20 @@ export default function SurveyPage() {
   const isLast = step === STEPS.length - 1;
 
   function handleNext() {
-    const val = current.trim() || (q.type === "slider" ? "5" : "");
+    // Serialize interactive pickers into a string value
+    let val = current.trim();
+    if (q.type === "daypicker") {
+      val = selectedDays.length > 0 ? selectedDays.join(", ") : "";
+    } else if (q.type === "sleeppicker") {
+      val = bedTime && wakeTime ? `sleep ${bedTime}, wake ${wakeTime}` : "";
+    } else if (q.type === "workoutpicker") {
+      if (workoutSlot === "i don't work out") val = "none";
+      else val = workoutDays.length > 0 && workoutSlot ? `${workoutDays.join(", ")} – ${workoutSlot}` : "";
+    } else {
+      val = current.trim() || (q.type === "slider" ? "5" : "");
+    }
     if (!val) {
-      setError("Please provide an answer before continuing.");
+      setError("Please make a selection before continuing.");
       return;
     }
     setError("");
@@ -168,9 +190,24 @@ export default function SurveyPage() {
     if (isLast) {
       submitProfile(updated);
     } else {
-      // Pre-fill if already answered
       const nextKey = STEPS[step + 1].key;
-      setCurrent(updated[nextKey] || (STEPS[step + 1].type === "slider" ? "5" : ""));
+      const nextType = STEPS[step + 1].type;
+      const saved = updated[nextKey] || "";
+      if (nextType === "daypicker") {
+        setSelectedDays(saved ? saved.split(", ") : []);
+      } else if (nextType === "sleeppicker") {
+        const m = saved.match(/sleep (.+), wake (.+)/);
+        setBedTime(m ? m[1] : ""); setWakeTime(m ? m[2] : "");
+      } else if (nextType === "workoutpicker") {
+        if (saved === "none") { setWorkoutDays([]); setWorkoutSlot("i don't work out"); }
+        else {
+          const parts = saved.split(" – ");
+          setWorkoutDays(parts[0] ? parts[0].split(", ") : []);
+          setWorkoutSlot(parts[1] || "");
+        }
+      } else {
+        setCurrent(saved || (STEPS[step + 1].type === "slider" ? "5" : ""));
+      }
       setStep((s) => s + 1);
     }
   }
@@ -178,7 +215,23 @@ export default function SurveyPage() {
   function handleBack() {
     setError("");
     const prevKey = STEPS[step - 1].key;
-    setCurrent(answers[prevKey] || (STEPS[step - 1].type === "slider" ? "5" : ""));
+    const prevType = STEPS[step - 1].type;
+    const saved = answers[prevKey] || "";
+    if (prevType === "daypicker") {
+      setSelectedDays(saved ? saved.split(", ") : []);
+    } else if (prevType === "sleeppicker") {
+      const m = saved.match(/sleep (.+), wake (.+)/);
+      setBedTime(m ? m[1] : ""); setWakeTime(m ? m[2] : "");
+    } else if (prevType === "workoutpicker") {
+      if (saved === "none") { setWorkoutDays([]); setWorkoutSlot("i don't work out"); }
+      else {
+        const parts = saved.split(" – ");
+        setWorkoutDays(parts[0] ? parts[0].split(", ") : []);
+        setWorkoutSlot(parts[1] || "");
+      }
+    } else {
+      setCurrent(saved || (prevType === "slider" ? "5" : ""));
+    }
     setStep((s) => s - 1);
   }
 
@@ -305,6 +358,115 @@ export default function SurveyPage() {
                 className={styles.slider}
               />
               <div className={styles.sliderVal}>{sliderVal} / {q.max}</div>
+            </div>
+          )}
+
+          {q.type === "daypicker" && (
+            <div className={styles.pickerWrap}>
+              <p className={styles.pickerHint}>{q.hint}</p>
+              <div className={styles.dayRow}>
+                {DAYS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`${styles.dayBtn} ${selectedDays.includes(d) ? styles.dayBtnOn : ""}`}
+                    onClick={() => setSelectedDays((prev) =>
+                      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              {selectedDays.length > 0 && (
+                <p className={styles.pickerSummary}>📅 {selectedDays.join(" · ")}</p>
+              )}
+            </div>
+          )}
+
+          {q.type === "sleeppicker" && (
+            <div className={styles.pickerWrap}>
+              <div className={styles.sleepRow}>
+                <div className={styles.sleepGroup}>
+                  <span className={styles.sleepLabel}>🌙 Bedtime</span>
+                  <div className={styles.timeGrid}>
+                    {q.bedTimes.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`${styles.timeBtn} ${bedTime === t ? styles.timeBtnOn : ""}`}
+                        onClick={() => setBedTime(t)}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.sleepDivider} />
+                <div className={styles.sleepGroup}>
+                  <span className={styles.sleepLabel}>☀️ Wake up</span>
+                  <div className={styles.timeGrid}>
+                    {q.wakeTimes.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`${styles.timeBtn} ${wakeTime === t ? styles.timeBtnOn : ""}`}
+                        onClick={() => setWakeTime(t)}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {bedTime && wakeTime && (
+                <p className={styles.pickerSummary}>😴 Sleep {bedTime} → Wake {wakeTime}</p>
+              )}
+            </div>
+          )}
+
+          {q.type === "workoutpicker" && (
+            <div className={styles.pickerWrap}>
+              <p className={styles.sleepLabel}>📆 Which days?</p>
+              <div className={styles.dayRow}>
+                {DAYS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`${styles.dayBtn} ${workoutDays.includes(d) ? styles.dayBtnOn : ""} ${workoutSlot === "i don't work out" ? styles.dayBtnDisabled : ""}`}
+                    onClick={() => {
+                      if (workoutSlot === "i don't work out") return;
+                      setWorkoutDays((prev) =>
+                        prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                      );
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <p className={styles.sleepLabel} style={{ marginTop: "18px" }}>⏰ What time?</p>
+              <div className={styles.slotRow}>
+                {WORKOUT_SLOTS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`${styles.slotBtn} ${workoutSlot === s.toLowerCase() ? styles.slotBtnOn : ""}`}
+                    onClick={() => {
+                      const val = s.toLowerCase();
+                      setWorkoutSlot(val);
+                      if (val === "i don't work out") setWorkoutDays([]);
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {((workoutDays.length > 0 && workoutSlot && workoutSlot !== "i don't work out") || workoutSlot === "i don't work out") && (
+                <p className={styles.pickerSummary}>
+                  {workoutSlot === "i don't work out" ? "🛋️ No workouts" : `🏋️ ${workoutDays.join(" · ")} – ${workoutSlot}`}
+                </p>
+              )}
             </div>
           )}
 
