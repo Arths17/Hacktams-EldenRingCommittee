@@ -50,6 +50,10 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.layout}>
+      {/* Ambient orbs */}
+      <div className={`${styles.orb} ${styles.orbGreen}`} />
+      <div className={`${styles.orb} ${styles.orbGold}`} />
+      
       <CampusFuelNav />
       <div className={styles.main}>
         <Header title="Dashboard" username={username || ""} />

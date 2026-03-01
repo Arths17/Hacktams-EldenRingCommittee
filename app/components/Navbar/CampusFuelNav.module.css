@@ -47,14 +47,15 @@
 }
 
 .brandMark {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
   background: var(--green);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(20, 90, 50, 0.2);
 }
 
 .brandText {
@@ -127,12 +128,15 @@
   font-family: inherit;
   display: inline-flex;
   align-items: center;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(20, 90, 50, 0.2);
 }
 
 .btnPrimary:hover {
   background: var(--green-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(20, 90, 50, 0.3);
 }
 
 .btnAi {
@@ -144,18 +148,19 @@
   cursor: pointer;
   border: 1px solid rgba(201, 155, 76, 0.5);
   background: rgba(201, 155, 76, 0.12);
-  color: #C99B4C;
+  color: var(--gold);
   text-decoration: none;
   font-family: inherit;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
   white-space: nowrap;
 }
 
 .btnAi:hover {
   background: rgba(201, 155, 76, 0.22);
-  border-color: #C99B4C;
-  color: #d9b470;
+  border-color: var(--gold-light);
+  color: var(--gold-light);
+  transform: translateY(-1px);
 }

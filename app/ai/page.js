@@ -147,6 +147,10 @@ export default function AIPage() {
   if (!profileReady) {
     return (
       <div className={styles.layout}>
+        {/* Ambient orbs */}
+        <div className={`${styles.orb} ${styles.orbGreen}`} />
+        <div className={`${styles.orb} ${styles.orbGold}`} />
+        
         <CampusFuelNav />
         <div className={styles.main}>
           <div className={styles.gateWrap}>
@@ -175,6 +179,10 @@ export default function AIPage() {
 
   return (
     <div className={styles.layout}>
+      {/* Ambient orbs */}
+      <div className={`${styles.orb} ${styles.orbGreen}`} />
+      <div className={`${styles.orb} ${styles.orbGold}`} />
+      
       <CampusFuelNav />
       <div className={styles.main}>
         {/* Header */}

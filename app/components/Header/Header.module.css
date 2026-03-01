@@ -2,8 +2,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 32px;
+  padding: 24px 36px;
   background-color: var(--white);
+  border-bottom: 1px solid var(--border);
 }
 
 .left {
@@ -13,14 +14,16 @@
 }
 
 .title {
-  font-size: 30px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 900;
   color: var(--green);
+  letter-spacing: -0.6px;
 }
 
 .date {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: var(--text-medium);
+  font-weight: 500;
 }
 
 .right {
@@ -32,11 +35,17 @@
 .searchBar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
+  gap: 10px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.searchBar:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(20, 90, 50, 0.08);
 }
 
 .searchIcon {
@@ -47,10 +56,10 @@
 .searchInput {
   border: none;
   background: transparent;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-dark);
   outline: none;
-  width: 200px;
+  width: 220px;
 }
 
 .searchInput::placeholder {
@@ -60,31 +69,41 @@
 .addBtn {
   background: var(--green);
   color: var(--white);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 9px 18px;
-  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 20px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
-  transition: background 0.18s;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(20, 90, 50, 0.2);
 }
 
 .addBtn:hover {
   background: var(--green-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(20, 90, 50, 0.3);
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--gold);
   color: var(--green-dark);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 6px rgba(201, 155, 76, 0.3);
+}
+
+.avatar:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(201, 155, 76, 0.4);
 }

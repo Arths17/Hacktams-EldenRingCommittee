@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./signup.module.css";
+
+const particles = [
+  { emoji: "🥗", left: "10%",  dur: "14s", delay: "0s",    size: "1.5rem" },
+  { emoji: "🍎", left: "25%", dur: "18s", delay: "3.2s",  size: "1.1rem" },
+  { emoji: "💪", left: "45%", dur: "11s", delay: "6.5s",  size: "1.4rem" },
+  { emoji: "💧", left: "65%", dur: "15s", delay: "1.8s",  size: "1.0rem" },
+  { emoji: "🥦", left: "80%", dur: "13s", delay: "9.0s",  size: "1.25rem" },
+];
 
 export default function SignupPage() {
   const router = useRouter();
@@ -62,6 +71,28 @@ export default function SignupPage() {
 
   return (
     <div className={styles.page}>
+      {/* Ambient orbs */}
+      <div className={`${styles.orb} ${styles.orbGreen}`} />
+      <div className={`${styles.orb} ${styles.orbGold}`} />
+      
+      {/* Floating particles */}
+      <div className={styles.particles}>
+        {particles.map((p, i) => (
+          <span
+            key={i}
+            className={styles.particle}
+            style={{
+              left: p.left,
+              fontSize: p.size,
+              animationDuration: p.dur,
+              animationDelay: p.delay,
+            }}
+          >
+            {p.emoji}
+          </span>
+        ))}
+      </div>
+
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.brand}>
@@ -130,7 +161,7 @@ export default function SignupPage() {
 
         <p className={styles.footer}>
           Already have an account?{" "}
-          <a href="/login" className={styles.link}>Sign in</a>
+          <Link href="/login" className={styles.link}>Sign in</Link>
         </p>
       </div>
     </div>

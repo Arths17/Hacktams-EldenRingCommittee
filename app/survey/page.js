@@ -222,6 +222,10 @@ export default function SurveyPage() {
 
   return (
     <div className={styles.page}>
+      {/* Ambient orbs */}
+      <div className={`${styles.orb} ${styles.orbGreen}`} />
+      <div className={`${styles.orb} ${styles.orbGold}`} />
+      
       {/* Header */}
       <div className={styles.topBar}>
         <span className={styles.brand}>🌿 CampusFuel</span>

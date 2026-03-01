@@ -7,6 +7,10 @@ const nextConfig = {
         destination: 'http://localhost:8000/login',
       },
       {
+        source: '/login',
+        destination: 'http://localhost:8000/login',
+      },
+      {
         source: '/api/signup',
         destination: 'http://localhost:8000/api/signup',
       },

@@ -915,7 +915,7 @@ async def get_user_churn_risk(user_id: str, request: Request):
     summary="Get at-risk user cohort",
     description="Get list of users at risk of churn above threshold",
 )
-async def get_at_risk_cohort(threshold: float = 0.5, request: Optional[Request] = None):
+async def get_at_risk_cohort(request: Request, threshold: float = 0.5):
     """Get cohort of users at risk of churn.
     
     Parameters:
@@ -926,13 +926,12 @@ async def get_at_risk_cohort(threshold: float = 0.5, request: Optional[Request] 
     ORDER BY churn_risk_score DESC
     """
     try:
-        if request:
-            payload = _decode_token(request)
-            if not payload:
-                return JSONResponse(
-                    {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
-                    status_code=401,
-                )
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
         
         if threshold < 0 or threshold > 1:
             return JSONResponse(
