@@ -397,7 +397,7 @@ async def chat(request: Request):
             nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
             research_ctx   = load_research_context()
             system_full    = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile) + nutrition_ctx
-            ]
+
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:
                 content = chunk["message"]["content"]

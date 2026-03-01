@@ -10,6 +10,7 @@ const navItems = [
   { label: "Meals", href: "/meals", icon: "🍽" },
   { label: "Nutrition", href: "/nutrition", icon: "📊" },
   { label: "Progress", href: "/progress", icon: "📈" },
+  { label: "AI Coach", href: "/ai", icon: "🤖" },
   { label: "Profile", href: "/profile", icon: "👤" },
   { label: "Settings", href: "/settings", icon: "⚙" },
 ];
