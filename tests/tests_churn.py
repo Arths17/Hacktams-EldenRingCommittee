@@ -14,8 +14,9 @@ from unittest.mock import patch, MagicMock, AsyncMock
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path for imports (file lives in tests/)
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
 
 from main import app
 from model.churn_prediction import churn_predictor
