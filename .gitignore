@@ -1,3 +1,16 @@
 .env
 model/chroma_db/
 logs/
+
+# Dependencies
+node_modules/
+.venv/
+
+# Next.js
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
