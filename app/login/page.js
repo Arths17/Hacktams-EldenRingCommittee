@@ -15,7 +15,7 @@ const particles = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(null); // { text, type: "success" | "error" }
@@ -111,7 +111,8 @@ export default function LoginPage() {
         setMessage({ text: "✗ Invalid username or password. Please try again.", type: "error" });
       }
     } catch {
-      const localHint = apiBase.includes("localhost")
+      const localHost = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+      const localHint = localHost
         ? " Backend may be offline — run: npm run backend"
         : "";
       setMessage({ text: `✗ Could not reach the server. Please try again.${localHint}`, type: "error" });

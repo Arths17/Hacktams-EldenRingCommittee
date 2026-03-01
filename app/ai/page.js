@@ -9,7 +9,7 @@ import styles from "./ai.module.css";
 // HTTP REQUEST UTILITIES (communicates with main.py backend)
 // ═══════════════════════════════════════════════════════════════════
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const STREAM_TIMEOUT = 120000; // 2 minutes
 
