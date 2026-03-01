@@ -2,30 +2,30 @@ import os
 import sys
 import json
 import bcrypt
-from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from dotenv import load_dotenv
 
 load_dotenv()
+
+# --- Supabase (optional) ---
+try:
+    from supabase import create_client
+    _sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+    USE_SUPABASE = True
+except Exception:
+    USE_SUPABASE = False
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
 
-# ── Supabase connection ───────────────────────────────────────────────────────
-try:
-    from db import create_user as db_create, login_user as db_login
-    from db import save_profile as db_save_profile, load_profile as db_load_profile
-    USE_SUPABASE = True
-    print("[startup] Supabase connected")
-except Exception as e:
-    USE_SUPABASE = False
-    print(f"[startup] Supabase unavailable, using users.json ({e})")
-
-# ── App setup ─────────────────────────────────────────────────────────────────
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "elden_ring"))
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SECRET_KEY", "elden_ring"),
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -33,108 +33,130 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
 
-# ── Local fallback helpers ────────────────────────────────────────────────────
-USERS_FILE = "users.json"
+# ── helpers ──────────────────────────────────────────────────────────────────
 
-def _local_users():
+def _local_login(username: str, password: str):
     try:
-        with open(USERS_FILE) as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
-    except Exception:
-        return []
+        with open("users.json", "r") as f:
+            users = json.load(f)
+        for u in users:
+            if u["username"] == username:
+                if bcrypt.checkpw(password.encode(), u["password"].encode()):
+                    return True, None
+                return False, "Incorrect password"
+        return False, "User not found"
+    except FileNotFoundError:
+        return False, "No users registered yet"
 
-def _local_login(username, password):
-    for u in _local_users():
+def _local_signup(username: str, password: str):
+    try:
+        with open("users.json", "r") as f:
+            users = json.load(f)
+    except FileNotFoundError:
+        users = []
+    for u in users:
         if u["username"] == username:
-            if bcrypt.checkpw(password.encode(), u["password"].encode()):
-                return {"success": True, "user_id": u["id"], "username": username}
-            return {"success": False, "error": "Incorrect password"}
-    return {"success": False, "error": "User not found"}
-
-def _local_signup(username, password):
-    users = _local_users()
-    if any(u["username"] == username for u in users):
-        return {"success": False, "error": "Username already taken"}
+            return False, "Username already taken"
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    new_id = max((u.get("id", 0) for u in users), default=0) + 1
-    users.append({"id": new_id, "username": username, "password": hashed})
-    with open(USERS_FILE, "w") as f:
+    users.append({"id": len(users) + 1, "username": username, "password": hashed})
+    with open("users.json", "w") as f:
         json.dump(users, f, indent=2)
-    return {"success": True, "user_id": new_id, "username": username}
+    return True, None
 
-# ── Page routes ───────────────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+# ── routes ───────────────────────────────────────────────────────────────────
 
-# ── Auth API ──────────────────────────────────────────────────────────────────
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    result = db_login(username, password) if USE_SUPABASE else _local_login(username, password)
-    if result["success"]:
-        request.session["username"] = result["username"]
-        request.session["user_id"]  = str(result["user_id"])
-    return JSONResponse(result)
+    if USE_SUPABASE:
+        try:
+            res = _sb.table("users").select("*").eq("username", username).execute()
+            if res.data:
+                row = res.data[0]
+                if bcrypt.checkpw(password.encode(), row["password"].encode()):
+                    request.session["user_id"] = row["id"]
+                    request.session["username"] = username
+                    return JSONResponse({"success": True})
+                return JSONResponse({"success": False, "error": "Incorrect password"})
+            return JSONResponse({"success": False, "error": "User not found"})
+        except Exception:
+            pass  # fall through to local
+    ok, err = _local_login(username, password)
+    if ok:
+        request.session["username"] = username
+        return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": err})
+
 
 @app.post("/api/signup")
 async def signup(request: Request, username: str = Form(...), password: str = Form(...)):
-    if len(username) < 3:
-        return JSONResponse({"success": False, "error": "Username too short (min 3)"})
-    if len(password) < 6:
-        return JSONResponse({"success": False, "error": "Password too short (min 6)"})
-    result = db_create(username, password) if USE_SUPABASE else _local_signup(username, password)
-    if result["success"]:
-        request.session["username"] = result["username"]
-        request.session["user_id"]  = str(result["user_id"])
-    return JSONResponse(result)
+    if USE_SUPABASE:
+        try:
+            existing = _sb.table("users").select("id").eq("username", username).execute()
+            if existing.data:
+                return JSONResponse({"success": False, "error": "Username already taken"})
+            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+            _sb.table("users").insert({"username": username, "password": hashed}).execute()
+            request.session["username"] = username
+            return JSONResponse({"success": True})
+        except Exception:
+            pass
+    ok, err = _local_signup(username, password)
+    if ok:
+        request.session["username"] = username
+        return JSONResponse({"success": True})
+    return JSONResponse({"success": False, "error": err})
+
 
 @app.post("/api/logout")
 async def logout(request: Request):
     request.session.clear()
     return JSONResponse({"success": True})
 
-# ── Profile API ───────────────────────────────────────────────────────────────
+
 @app.get("/api/me")
-async def get_me(request: Request):
+async def me(request: Request):
     username = request.session.get("username")
-    user_id  = request.session.get("user_id")
     if not username:
         return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
     profile = {}
-    if USE_SUPABASE and user_id:
-        profile = db_load_profile(user_id) or {}
+    if USE_SUPABASE:
+        try:
+            user_id = request.session.get("user_id")
+            if user_id:
+                res = _sb.table("profiles").select("*").eq("user_id", user_id).execute()
+                if res.data:
+                    profile = res.data[0]
+        except Exception:
+            pass
+    if not profile:
+        try:
+            with open("user_profile.json", "r") as f:
+                profile = json.load(f)
+        except FileNotFoundError:
+            pass
     return JSONResponse({"success": True, "username": username, "profile": profile})
 
+
 @app.post("/api/profile")
-async def save_profile(
-    request: Request,
-    name: str = Form(""), age: str = Form(""), gender: str = Form(""),
-    height: str = Form(""), weight: str = Form(""), goal: str = Form(""),
-    diet_type: str = Form(""), allergies: str = Form(""), budget: str = Form(""),
-):
-    user_id = request.session.get("user_id")
-    if not user_id:
+async def save_profile(request: Request):
+    username = request.session.get("username")
+    if not username:
         return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
-    profile = {
-        "name": name, "age": age, "gender": gender,
-        "height": height, "weight": weight, "goal": goal,
-        "diet_type": diet_type, "allergies": allergies, "budget": budget,
-    }
+    data = await request.json()
     if USE_SUPABASE:
-        ok = db_save_profile(user_id, profile)
-    else:
         try:
-            with open("user_profile.json") as f:
-                all_p = json.load(f)
-                if not isinstance(all_p, dict): all_p = {}
+            user_id = request.session.get("user_id")
+            if user_id:
+                existing = _sb.table("profiles").select("id").eq("user_id", user_id).execute()
+                if existing.data:
+                    _sb.table("profiles").update(data).eq("user_id", user_id).execute()
+                else:
+                    _sb.table("profiles").insert({**data, "user_id": user_id}).execute()
+                return JSONResponse({"success": True})
         except Exception:
-            all_p = {}
-        all_p[user_id] = profile
-        with open("user_profile.json", "w") as f:
-            json.dump(all_p, f, indent=2)
-        ok = True
-    return JSONResponse({"success": ok})
+            pass
+    with open("user_profile.json", "w") as f:
+        json.dump(data, f, indent=2)
+    return JSONResponse({"success": True})
+
