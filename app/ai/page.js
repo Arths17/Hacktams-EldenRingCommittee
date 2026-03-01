@@ -16,6 +16,15 @@ export default function AIPage() {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    }
+  }, [input]);
+
   // Check for profile on mount - fetch from backend based on logged-in user
   useEffect(() => {
     async function loadProfile() {
@@ -237,23 +246,24 @@ export default function AIPage() {
 
         {/* Input area */}
         <div className={styles.inputArea}>
-          <textarea
-            ref={inputRef}
-            className={styles.chatInput}
-            placeholder="Ask your AI health coach anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={2}
-            disabled={loading}
-          />
-          <button
-            className={styles.sendBtn}
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-          >
-            {loading ? "..." : "Send"}
-          </button>
+          <div className={styles.inputContainer}>
+            <textarea
+              ref={inputRef}
+              className={styles.chatInput}
+              placeholder="Ask your AI health coach anything..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+            />
+            <button
+              className={styles.sendBtn}
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+            >
+              {loading ? "..." : "Send"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -15,7 +15,6 @@
   justify-content: space-between;
   padding: 18px 32px;
   background: var(--white);
-  border-bottom: 1px solid var(--border);
 }
 
 .brand {
@@ -63,7 +62,7 @@
 }
 
 .question {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--text-dark);
   line-height: 1.3;

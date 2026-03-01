@@ -734,18 +734,31 @@ async def save_profile(request: Request):
         user_id = payload.get("user_id")
         data = await request.json()
         
-        # Validate profile data (basic checks)
+        # Validate profile data (basic checks) - handle both string and numeric values
         if isinstance(data, dict):
-            if "age" in data and not (13 <= data["age"] <= 120):
-                return JSONResponse(
-                    {"success": False, "error": "Age must be between 13 and 120", "error_code": "VALIDATION_ERROR"},
-                    status_code=422,
-                )
-            if "weight_kg" in data and not (30 < data["weight_kg"] < 200):
-                return JSONResponse(
-                    {"success": False, "error": "Weight must be between 30 and 200 kg", "error_code": "VALIDATION_ERROR"},
-                    status_code=422,
-                )
+            # Convert age to int if it's a string and validate
+            if "age" in data:
+                try:
+                    age_val = int(data["age"]) if isinstance(data["age"], str) else data["age"]
+                    if not (13 <= age_val <= 120):
+                        return JSONResponse(
+                            {"success": False, "error": "Age must be between 13 and 120", "error_code": "VALIDATION_ERROR"},
+                            status_code=422,
+                        )
+                except (ValueError, TypeError):
+                    pass  # Allow non-numeric age strings like "20s"
+            
+            # Convert weight_kg to float if it's a string and validate
+            if "weight_kg" in data:
+                try:
+                    weight_val = float(data["weight_kg"]) if isinstance(data["weight_kg"], str) else data["weight_kg"]
+                    if not (30 < weight_val < 200):
+                        return JSONResponse(
+                            {"success": False, "error": "Weight must be between 30 and 200 kg", "error_code": "VALIDATION_ERROR"},
+                            status_code=422,
+                        )
+                except (ValueError, TypeError):
+                    pass  # Allow non-numeric weight strings like "150 lbs"
         
         # Try Supabase first
         if USE_SUPABASE and user_id:

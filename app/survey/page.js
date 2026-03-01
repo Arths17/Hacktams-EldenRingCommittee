@@ -206,7 +206,10 @@ export default function SurveyPage() {
         localStorage.setItem("campusfuel_profile", JSON.stringify(profile));
         router.push("/ai");
       } else {
-        throw new Error("Failed to save profile");
+        // Get error details from response
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Profile save failed:", response.status, errorData);
+        throw new Error(errorData.error || `Failed to save profile (${response.status})`);
       }
     } catch (err) {
       console.error("Profile save error:", err);
