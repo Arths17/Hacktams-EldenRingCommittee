@@ -1032,6 +1032,25 @@ async def chat(request: Request):
             """Generate chat response stream."""
             try:
                 import ollama
+                
+                # Check if Ollama is available before proceeding
+                try:
+                    ollama.list()
+                except Exception as ollama_err:
+                    yield "⚠️ **AI Service Unavailable**\n\n"
+                    yield "The AI chat service (Ollama) is not running. To fix this:\n\n"
+                    yield "1. **Install Ollama** (if not installed):\n"
+                    yield "   - Download from: https://ollama.ai\n"
+                    yield "   - Install and restart your terminal\n\n"
+                    yield "2. **Start Ollama**:\n"
+                    yield "   - Run: `ollama serve` in a terminal\n"
+                    yield "   - Or start the Ollama app\n\n"
+                    yield "3. **Pull the model** (first time only):\n"
+                    yield "   - Run: `ollama pull llama3.1:8b`\n\n"
+                    yield f"Error details: {str(ollama_err)[:100]}\n"
+                    logger.error(f"Ollama unavailable: {ollama_err}")
+                    return
+                
                 from model.model import MODEL_NAME, build_full_context
                 from model.constraint_graph import ConstraintGraph
                 from model.validation import parse_profile as _parse_profile
