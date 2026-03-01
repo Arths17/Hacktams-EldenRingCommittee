@@ -11,40 +11,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export default function MealsPage() {
   const router = useRouter();
   const [username, setUsername] = useState(null);
-  const [meals, setMeals] = useState([
-    {
-      id: 1,
-      type: "Breakfast",
-      time: "8:30 AM",
-      items: [
-        { name: "Oatmeal with berries", calories: 320, protein: 12, carbs: 54, fat: 6 },
-        { name: "Greek yogurt", calories: 150, protein: 15, carbs: 8, fat: 4 },
-      ],
-      total: { calories: 470, protein: 27, carbs: 62, fat: 10 }
-    },
-    {
-      id: 2,
-      type: "Lunch",
-      time: "1:00 PM",
-      items: [
-        { name: "Grilled chicken breast", calories: 280, protein: 53, carbs: 0, fat: 6 },
-        { name: "Brown rice", calories: 215, protein: 5, carbs: 45, fat: 2 },
-        { name: "Mixed vegetables", calories: 80, protein: 3, carbs: 15, fat: 1 },
-      ],
-      total: { calories: 575, protein: 61, carbs: 60, fat: 9 }
-    },
-    {
-      id: 3,
-      type: "Dinner",
-      time: "7:00 PM",
-      items: [
-        { name: "Salmon fillet", calories: 367, protein: 39, carbs: 0, fat: 22 },
-        { name: "Sweet potato", calories: 180, protein: 4, carbs: 41, fat: 0 },
-        { name: "Broccoli", calories: 55, protein: 4, carbs: 11, fat: 1 },
-      ],
-      total: { calories: 602, protein: 47, carbs: 52, fat: 23 }
-    },
-  ]);
+  const [meals, setMeals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMeal, setNewMeal] = useState({
@@ -75,10 +43,31 @@ export default function MealsPage() {
           router.push("/login");
         } else {
           setUsername(data.username);
+          // Fetch meals after authentication
+          fetchMeals(token);
         }
       })
       .catch(() => router.push("/login"));
   }, [router]);
+
+  const fetchMeals = async (token) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meals`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+      const data = await response.json();
+      if (data.success && data.meals) {
+        setMeals(data.meals);
+      }
+    } catch (error) {
+      console.error("Failed to fetch meals:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalDailyNutrition = meals.reduce((acc, meal) => ({
     calories: acc.calories + meal.total.calories,
@@ -112,7 +101,7 @@ export default function MealsPage() {
     });
   };
 
-  const handleSaveMeal = () => {
+  const handleSaveMeal = async () => {
     if (newMeal.items.length === 0) return;
 
     const total = newMeal.items.reduce((acc, item) => ({
@@ -122,21 +111,44 @@ export default function MealsPage() {
       fat: acc.fat + item.fat,
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-    const meal = {
-      id: meals.length + 1,
+    const mealData = {
       type: newMeal.type,
       time: newMeal.time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       items: newMeal.items,
-      total
+      total,
+      timestamp: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0]
     };
 
-    setMeals([...meals, meal]);
-    setShowAddModal(false);
-    setNewMeal({
-      type: "Breakfast",
-      time: "",
-      items: []
-    });
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/meals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify(mealData)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Refresh meals list
+        await fetchMeals(token);
+        setShowAddModal(false);
+        setNewMeal({
+          type: "Breakfast",
+          time: "",
+          items: []
+        });
+      } else {
+        alert('Failed to save meal: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error saving meal:', error);
+      alert('Failed to save meal. Please try again.');
+    }
   };
 
   const deleteMeal = (id) => {
@@ -242,14 +254,14 @@ export default function MealsPage() {
               <p className={styles.noMeals}>No meals logged yet. Start by adding your first meal!</p>
             ) : (
               <div className={styles.mealsList}>
-                {meals.map((meal) => (
-                  <div key={meal.id} className={styles.mealCard}>
+                {meals.map((meal, index) => (
+                  <div key={meal.timestamp || meal.id || index} className={styles.mealCard}>
                     <div className={styles.mealHeader}>
                       <div>
                         <h3 className={styles.mealType}>{meal.type}</h3>
                         <p className={styles.mealTime}>{meal.time}</p>
                       </div>
-                      <button className={styles.deleteButton} onClick={() => deleteMeal(meal.id)}>
+                      <button className={styles.deleteButton} onClick={() => deleteMeal(meal.timestamp || meal.id)}>
                         🗑️
                       </button>
                     </div>
