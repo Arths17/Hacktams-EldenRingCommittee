@@ -1,7 +1,7 @@
-import Sidebar from "../components/Sidebar";
-import Header from "../components/Header";
-import StatsCard from "../components/StatsCard";
-import MealLog from "../components/MealLog";
+import Sidebar from "../components/Sidebar/Sidebar";
+import Header from "../components/Header/Header";
+import StatsCard from "../components/StatsCard/StatsCard";
+import MealLog from "../components/MealLog/MealLog";
 import styles from "./dashboard.module.css";
 
 const stats = [
