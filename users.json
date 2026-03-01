@@ -1,7 +1,11 @@
 [
   {
-    "id": 1,
     "username": "admin",
     "password": "$2b$12$MpqpKcFZ1Kb0k8wlBm010OjMeRyBcAxBSGmXgKbD7IJgtUL.HSMs2"
+  },
+  {
+    "id": 2,
+    "username": "shreyas",
+    "password": "$2b$12$Pk7aBihtO1WWxaFKPXX/D.jzGsAVKmQbMyB.XuB9Fl0oRe7nI5i8K"
   }
 ]

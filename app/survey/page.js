@@ -187,7 +187,7 @@ export default function SurveyPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await fetch("http://localhost:8000/api/profile", {
+      await fetch("/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
