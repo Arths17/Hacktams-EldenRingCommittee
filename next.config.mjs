@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const rawBackendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const backendUrlWithProtocol = /^https?:\/\//i.test(rawBackendUrl)
+      ? rawBackendUrl
+      : `https://${rawBackendUrl}`;
+    const backendUrl = backendUrlWithProtocol.replace(/\/+$/, '');
     return [
       {
         source: '/api/login',
