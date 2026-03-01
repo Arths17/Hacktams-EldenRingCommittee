@@ -264,62 +264,63 @@ def _local_signup(username: str, password: str):
     return True, None
 
 @app.post("/login")
-async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+async def login(username: str = Form(...), password: str = Form(...)):
     if USE_SUPABASE:
         try:
             res = _sb.table("users").select("*").eq("username", username).execute()
             if res.data:
                 row = res.data[0]
                 if bcrypt.checkpw(password.encode(), row["password"].encode()):
-                    request.session["user_id"] = row["id"]
-                    request.session["username"] = username
-                    return JSONResponse({"success": True})
+                    token = _make_token(username, row["id"])
+                    return JSONResponse({"success": True, "token": token})
                 return JSONResponse({"success": False, "error": "Incorrect password"})
             return JSONResponse({"success": False, "error": "User not found"})
         except Exception:
             pass  # fall through to local
     ok, err = _local_login(username, password)
     if ok:
-        request.session["username"] = username
-        return JSONResponse({"success": True})
+        token = _make_token(username)
+        return JSONResponse({"success": True, "token": token})
     return JSONResponse({"success": False, "error": err})
 
 
 @app.post("/api/signup")
-async def signup(request: Request, username: str = Form(...), password: str = Form(...)):
+async def signup(username: str = Form(...), password: str = Form(...)):
     if USE_SUPABASE:
         try:
             existing = _sb.table("users").select("id").eq("username", username).execute()
             if existing.data:
                 return JSONResponse({"success": False, "error": "Username already taken"})
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            _sb.table("users").insert({"username": username, "password": hashed}).execute()
-            request.session["username"] = username
-            return JSONResponse({"success": True})
+            res = _sb.table("users").insert({"username": username, "password": hashed}).execute()
+            user_id = res.data[0]["id"] if res.data else None
+            token = _make_token(username, user_id)
+            return JSONResponse({"success": True, "token": token})
         except Exception:
             pass
     ok, err = _local_signup(username, password)
     if ok:
-        request.session["username"] = username
-        return JSONResponse({"success": True})
+        token = _make_token(username)
+        return JSONResponse({"success": True, "token": token})
     return JSONResponse({"success": False, "error": err})
 
 
 @app.post("/api/logout")
-async def logout(request: Request):
-    request.session.clear()
+async def logout():
+    # JWT is stateless, client just deletes the token
     return JSONResponse({"success": True})
 
 
 @app.get("/api/me")
 async def me(request: Request):
-    username = request.session.get("username")
-    if not username:
+    payload = _decode_token(request)
+    if not payload:
         return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
+    username = payload["username"]
+    user_id = payload.get("user_id")
     profile = {}
     if USE_SUPABASE:
         try:
-            user_id = request.session.get("user_id")
             if user_id:
                 res = _sb.table("profiles").select("*").eq("user_id", user_id).execute()
                 if res.data:
@@ -337,13 +338,14 @@ async def me(request: Request):
 
 @app.post("/api/profile")
 async def save_profile(request: Request):
-    username = request.session.get("username")
-    if not username:
+    payload = _decode_token(request)
+    if not payload:
         return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
+    username = payload["username"]
+    user_id = payload.get("user_id")
     data = await request.json()
     if USE_SUPABASE:
         try:
-            user_id = request.session.get("user_id")
             if user_id:
                 existing = _sb.table("profiles").select("id").eq("user_id", user_id).execute()
                 if existing.data:
@@ -353,16 +355,18 @@ async def save_profile(request: Request):
                 return JSONResponse({"success": True})
         except Exception:
             pass
-    with open(_profile_path(payload["username"]), "w") as f:
+    with open(_profile_path(username), "w") as f:
         json.dump(data, f, indent=2)
     return JSONResponse({"success": True})
 
 
 @app.post("/api/chat")
 async def chat(request: Request):
-    username = request.session.get("username")
-    if not username:
+    payload = _decode_token(request)
+    if not payload:
         return JSONResponse({"success": False, "error": "Not logged in"}, status_code=401)
+    username = payload["username"]
+    user_id = payload.get("user_id")
 
     body = await request.json()
     message = body.get("message", "").strip()
@@ -373,7 +377,6 @@ async def chat(request: Request):
     profile = {}
     if USE_SUPABASE:
         try:
-            user_id = request.session.get("user_id")
             if user_id:
                 res = _sb.table("profiles").select("*").eq("user_id", user_id).execute()
                 if res.data:
@@ -391,13 +394,21 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
-            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context
+            from model.model import SYSTEM_PROMPT, MODEL_NAME, load_research_context
 
             nutrition_db.load()
             nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
             research_ctx   = load_research_context()
-            system_full    = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile) + nutrition_ctx
+            
+            # Build context from profile (simplified version for API)
+            profile_ctx = "\n".join([f"  • {k}: {v}" for k, v in profile.items()])
+            system_full    = SYSTEM_PROMPT + research_ctx + "\n\nUser Profile:\n" + profile_ctx + nutrition_ctx
 
+            messages = [
+                {"role": "system", "content": system_full},
+                {"role": "user", "content": message},
+            ]
+            
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:
                 content = chunk["message"]["content"]
