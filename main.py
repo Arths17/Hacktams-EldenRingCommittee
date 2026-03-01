@@ -138,8 +138,8 @@ if os.environ.get("VERCEL_URL"):
     ])
 
 # Allow custom domain if set
-if os.environ.get("FRONTEND_URL"):
-    allowed_origins.append(os.environ.get("FRONTEND_URL"))
+if frontend_url := os.environ.get("FRONTEND_URL"):
+    allowed_origins.append(frontend_url)
 
 app.add_middleware(
     CORSMiddleware,
