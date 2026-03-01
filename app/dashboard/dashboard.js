@@ -181,9 +181,6 @@ function generateInsights(profile, goals) {
   return tips.slice(0, 5);
 }
 
-// Today's logged meal totals (from MealLog static data)
-const LOGGED = { calories: 1900, protein: 108, carbs: 197, fat: 55 };
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -192,6 +189,8 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState({});
   const [goals, setGoals] = useState({ calorieGoal: 2400, proteinG: 150, carbsG: 300, fatG: 65, waterGlasses: 8 });
   const [waterGlasses, setWaterGlasses] = useState(6); // Track water intake
+  const [todayMeals, setTodayMeals] = useState([]);
+  const [loadingMeals, setLoadingMeals] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -219,6 +218,25 @@ export default function DashboardPage() {
     if (savedWater) {
       setWaterGlasses(parseInt(savedWater));
     }
+
+    // Fetch today's meals for real nutrition totals
+    if (token) {
+      const today = new Date().toISOString().split('T')[0];
+      fetch(`${API_BASE_URL}/api/meals?date=${today}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true"
+        }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.meals) {
+            setTodayMeals(data.meals);
+          }
+          setLoadingMeals(false);
+        })
+        .catch(() => setLoadingMeals(false));
+    }
   }, [router]);
 
   const toggleWaterGlass = (index) => {
@@ -241,10 +259,18 @@ export default function DashboardPage() {
   const insights = generateInsights(profile, goals);
   const hasProfile = Object.keys(profile).length > 0;
 
+  // Calculate today's totals from meals
+  const LOGGED = todayMeals.reduce((acc, meal) => ({
+    calories: acc.calories + (meal.total?.calories || 0),
+    protein: acc.protein + (meal.total?.protein || 0),
+    carbs: acc.carbs + (meal.total?.carbs || 0),
+    fat: acc.fat + (meal.total?.fat || 0),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
   const stats = [
     {
       label: "Calories",
-      value: LOGGED.calories.toLocaleString(),
+      value: loadingMeals ? "..." : LOGGED.calories.toLocaleString(),
       unit: "kcal",
       icon: "🔥",
       progress: Math.min(Math.round((LOGGED.calories / goals.calorieGoal) * 100), 110),
@@ -253,7 +279,7 @@ export default function DashboardPage() {
     },
     {
       label: "Protein",
-      value: LOGGED.protein.toString(),
+      value: loadingMeals ? "..." : LOGGED.protein.toString(),
       unit: "g",
       icon: "💪",
       progress: Math.min(Math.round((LOGGED.protein / goals.proteinG) * 100), 110),
@@ -262,7 +288,7 @@ export default function DashboardPage() {
     },
     {
       label: "Carbs",
-      value: LOGGED.carbs.toString(),
+      value: loadingMeals ? "..." : LOGGED.carbs.toString(),
       unit: "g",
       icon: "🌾",
       progress: Math.min(Math.round((LOGGED.carbs / goals.carbsG) * 100), 110),
@@ -271,7 +297,7 @@ export default function DashboardPage() {
     },
     {
       label: "Fat",
-      value: LOGGED.fat.toString(),
+      value: loadingMeals ? "..." : LOGGED.fat.toString(),
       unit: "g",
       icon: "🥑",
       progress: Math.min(Math.round((LOGGED.fat / goals.fatG) * 100), 110),

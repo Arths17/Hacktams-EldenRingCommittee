@@ -14,17 +14,8 @@ export default function ProgressPage() {
   const [profile, setProfile] = useState({});
   const [timeRange, setTimeRange] = useState("week"); // week, month, year
   const [churnRisk, setChurnRisk] = useState(null);
-
-  // Mock data for charts - in production, fetch from API
-  const weeklyData = [
-    { day: "Mon", calories: 2200, protein: 95, workouts: 1 },
-    { day: "Tue", calories: 2400, protein: 110, workouts: 0 },
-    { day: "Wed", calories: 1950, protein: 88, workouts: 1 },
-    { day: "Thu", calories: 2600, protein: 120, workouts: 1 },
-    { day: "Fri", calories: 2300, protein: 102, workouts: 0 },
-    { day: "Sat", calories: 1800, protein: 75, workouts: 1 },
-    { day: "Sun", calories: 2100, protein: 92, workouts: 0 },
-  ];
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   const achievements = [
     { id: 1, icon: "🔥", title: "7 Day Streak", description: "Logged meals for 7 days in a row", unlocked: true },
@@ -63,12 +54,66 @@ export default function ProgressPage() {
         }
       })
       .catch(() => router.push("/login"));
+
+    // Fetch weekly meals data
+    if (token) {
+      fetchWeeklyMeals(token);
+    }
   }, [router]);
 
-  const maxCalories = Math.max(...weeklyData.map(d => d.calories));
-  const maxProtein = Math.max(...weeklyData.map(d => d.protein));
-  const avgCalories = Math.round(weeklyData.reduce((sum, d) => sum + d.calories, 0) / weeklyData.length);
-  const avgProtein = Math.round(weeklyData.reduce((sum, d) => sum + d.protein, 0) / weeklyData.length);
+  const fetchWeeklyMeals = async (token) => {
+    try {
+      // Fetch meals for the past 7 days
+      const today = new Date();
+      const mealsPromises = [];
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        mealsPromises.push(
+          fetch(`${API_BASE_URL}/api/meals?date=${dateStr}`, {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "ngrok-skip-browser-warning": "true"
+            }
+          }).then(r => r.json())
+        );
+      }
+
+      const results = await Promise.all(mealsPromises);
+      const weeklyDataCalculated = results.map((result, index) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (6 - index));
+        const dayName = dayNames[date.getDay()];
+        
+        const meals = result.success ? result.meals : [];
+        const totals = meals.reduce((acc, meal) => ({
+          calories: acc.calories + (meal.total?.calories || 0),
+          protein: acc.protein + (meal.total?.protein || 0),
+          workouts: acc.workouts // Keep workouts at 0 for now
+        }), { calories: 0, protein: 0, workouts: 0 });
+
+        return {
+          day: dayName,
+          ...totals
+        };
+      });
+
+      setWeeklyData(weeklyDataCalculated);
+    } catch (error) {
+      console.error("Failed to fetch weekly meals:", error);
+      setWeeklyData([]);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const maxCalories = weeklyData.length > 0 ? Math.max(...weeklyData.map(d => d.calories)) : 0;
+  const maxProtein = weeklyData.length > 0 ? Math.max(...weeklyData.map(d => d.protein)) : 0;
+  const avgCalories = weeklyData.length > 0 ? Math.round(weeklyData.reduce((sum, d) => sum + d.calories, 0) / weeklyData.length) : 0;
+  const avgProtein = weeklyData.length > 0 ? Math.round(weeklyData.reduce((sum, d) => sum + d.protein, 0) / weeklyData.length) : 0;
   const totalWorkouts = weeklyData.reduce((sum, d) => sum + d.workouts, 0);
 
   return (
@@ -140,18 +185,24 @@ export default function ProgressPage() {
                 </div>
               </div>
               <div className={styles.chart}>
-                {weeklyData.map((data, idx) => (
-                  <div key={idx} className={styles.barGroup}>
-                    <div className={styles.barContainer}>
-                      <div 
-                        className={styles.bar}
-                        style={{ height: `${(data.calories / maxCalories) * 100}%` }}
-                        title={`${data.calories} kcal`}
-                      />
+                {loadingData ? (
+                  <div className={styles.chartNote}>Loading weekly data...</div>
+                ) : weeklyData.length === 0 ? (
+                  <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
+                ) : (
+                  weeklyData.map((data, idx) => (
+                    <div key={idx} className={styles.barGroup}>
+                      <div className={styles.barContainer}>
+                        <div 
+                          className={styles.bar}
+                          style={{ height: `${maxCalories > 0 ? (data.calories / maxCalories) * 100 : 0}%` }}
+                          title={`${data.calories} kcal`}
+                        />
+                      </div>
+                      <span className={styles.barLabel}>{data.day}</span>
                     </div>
-                    <span className={styles.barLabel}>{data.day}</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <p className={styles.chartNote}>Goal: 2400 kcal/day</p>
             </div>
@@ -159,18 +210,24 @@ export default function ProgressPage() {
             <div className={styles.chartCard}>
               <h2 className={styles.chartTitle}>💪 Protein Intake</h2>
               <div className={styles.chart}>
-                {weeklyData.map((data, idx) => (
-                  <div key={idx} className={styles.barGroup}>
-                    <div className={styles.barContainer}>
-                      <div 
-                        className={`${styles.bar} ${styles.barProtein}`}
-                        style={{ height: `${(data.protein / maxProtein) * 100}%` }}
-                        title={`${data.protein}g`}
-                      />
+                {loadingData ? (
+                  <div className={styles.chartNote}>Loading weekly data...</div>
+                ) : weeklyData.length === 0 ? (
+                  <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
+                ) : (
+                  weeklyData.map((data, idx) => (
+                    <div key={idx} className={styles.barGroup}>
+                      <div className={styles.barContainer}>
+                        <div 
+                          className={`${styles.bar} ${styles.barProtein}`}
+                          style={{ height: `${maxProtein > 0 ? (data.protein / maxProtein) * 100 : 0}%` }}
+                          title={`${data.protein}g`}
+                        />
+                      </div>
+                      <span className={styles.barLabel}>{data.day}</span>
                     </div>
-                    <span className={styles.barLabel}>{data.day}</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <p className={styles.chartNote}>Goal: 108g/day</p>
             </div>
