@@ -66,6 +66,32 @@ const steps = [
   },
 ];
 
+const particles = [
+  { emoji: "🥗", left: "6%",  dur: "14s", delay: "0s",    size: "1.5rem" },
+  { emoji: "🍎", left: "16%", dur: "18s", delay: "3.2s",  size: "1.1rem" },
+  { emoji: "💪", left: "27%", dur: "11s", delay: "6.5s",  size: "1.4rem" },
+  { emoji: "💧", left: "40%", dur: "15s", delay: "1.8s",  size: "1.0rem" },
+  { emoji: "🥦", left: "53%", dur: "13s", delay: "9.0s",  size: "1.25rem" },
+  { emoji: "🏃", left: "65%", dur: "16s", delay: "4.4s",  size: "1.1rem" },
+  { emoji: "🍌", left: "76%", dur: "12s", delay: "7.7s",  size: "1.3rem" },
+  { emoji: "⚡", left: "88%", dur: "10s", delay: "2.1s",  size: "1.0rem" },
+  { emoji: "🫐", left: "33%", dur: "17s", delay: "11.3s", size: "1.15rem" },
+  { emoji: "🥑", left: "58%", dur: "20s", delay: "5.9s",  size: "1.2rem" },
+];
+
+const tickerItems = [
+  { icon: "🔥", text: "Track every calorie — know exactly what you're fuelling with" },
+  { icon: "💪", text: "Protein goal hit? Your muscles will thank you" },
+  { icon: "💧", text: "8 glasses a day keeps the brain fog away" },
+  { icon: "🧠", text: "AI Coach available 24/7 — ask anything, anytime" },
+  { icon: "🥦", text: "Aim for 5 colourful servings of veg every day" },
+  { icon: "📊", text: "Weekly insights to keep your progress on track" },
+  { icon: "⚡", text: "Energy peaks at 10am — time your biggest meals right" },
+  { icon: "🎯", text: "Set a goal, build a streak, become unstoppable" },
+  { icon: "🍌", text: "Complex carbs = sustained energy for long study sessions" },
+  { icon: "🏃", text: "Active students burn up to 500 extra kcal per day" },
+];
+
 export default function LandingPage() {
   useEffect(() => {
     const els = document.querySelectorAll("." + styles.reveal);
@@ -103,6 +129,26 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section className={styles.hero}>
+        {/* ambient orbs */}
+        <div className={`${styles.orb} ${styles.orbGreen}`} />
+        <div className={`${styles.orb} ${styles.orbGold}`} />
+        {/* floating particles */}
+        <div className={styles.particles}>
+          {particles.map((p, i) => (
+            <span
+              key={i}
+              className={styles.particle}
+              style={{
+                left: p.left,
+                fontSize: p.size,
+                animationDuration: p.dur,
+                animationDelay: p.delay,
+              }}
+            >
+              {p.emoji}
+            </span>
+          ))}
+        </div>
         <div className={styles.heroInner}>
           <span className={styles.heroTag}>🌱 Campus Nutrition, Simplified</span>
           <h1 className={styles.heroTitle}>
@@ -123,6 +169,21 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Ticker ── */}
+      <div className={styles.ticker}>
+        <div className={styles.tickerTrack}>
+          {[...tickerItems, ...tickerItems].map((t, i) => (
+            <span key={i} className={styles.tickerItem}>
+              <span className={styles.tickerDot}>{t.icon}</span>
+              {t.text}
+              {i < tickerItems.length * 2 - 1 && (
+                <span className={styles.tickerDot} style={{ marginLeft: "2.5rem", opacity: 0.4 }}>•</span>
+              )}
+            </span>
+          ))}
+        </div>
+      </div>
 
       {/* ── Stats Bar ── */}
       <div className={styles.statsBar}>
