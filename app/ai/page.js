@@ -16,22 +16,45 @@ export default function AIPage() {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Check for profile on mount
+  // Check for profile on mount - fetch from backend based on logged-in user
   useEffect(() => {
-    const saved = localStorage.getItem("campusfuel_profile");
-    if (saved) {
-      try {
-        const p = JSON.parse(saved);
-        setProfileName(p.name || "");
-        setProfileReady(true);
-      } catch {
-        setProfileReady(false);
+    async function loadProfile() {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
       }
-    } else {
-      setProfileReady(false);
+
+      try {
+        const res = await fetch("/api/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          router.push("/login");
+          return;
+        }
+
+        // Check if user has a profile
+        if (data.profile && Object.keys(data.profile).length > 0) {
+          setProfileName(data.profile.name || data.username || "");
+          setProfileReady(true);
+          // Update localStorage as cache
+          localStorage.setItem("campusfuel_profile", JSON.stringify(data.profile));
+        } else {
+          setProfileReady(false);
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+        setProfileReady(false);
+      } finally {
+        setCheckingProfile(false);
+      }
     }
-    setCheckingProfile(false);
-  }, []);
+
+    loadProfile();
+  }, [router]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

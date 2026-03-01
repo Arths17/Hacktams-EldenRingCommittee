@@ -13,7 +13,7 @@ from datetime import datetime
 
 class LoginRequest(BaseModel):
     """Login endpoint request."""
-    username: str = Field(..., min_length=3, max_length=50, regex="^[a-zA-Z0-9_-]+$")
+    username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_-]+$")
     password: str = Field(..., min_length=8, max_length=128)
     
     class Config:
@@ -22,7 +22,7 @@ class LoginRequest(BaseModel):
 
 class SignupRequest(BaseModel):
     """Signup endpoint request."""
-    username: str = Field(..., min_length=3, max_length=50, regex="^[a-zA-Z0-9_-]+$")
+    username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_-]+$")
     password: str = Field(..., min_length=8, max_length=128)
     password_confirm: str = Field(..., min_length=8, max_length=128)
     
@@ -45,7 +45,7 @@ class ProfileUpdateRequest(BaseModel):
     age: Optional[int] = Field(None, ge=13, le=120)
     weight_kg: Optional[float] = Field(None, gt=30, lt=200)
     height_cm: Optional[float] = Field(None, gt=100, lt=250)
-    activity_level: Optional[str] = Field(None, regex="^(sedentary|light|moderate|active|very_active)$")
+    activity_level: Optional[str] = Field(None, pattern="^(sedentary|light|moderate|active|very_active)$")
     dietary_restrictions: Optional[list[str]] = Field(None, max_items=10)
     health_goals: Optional[list[str]] = Field(None, max_items=10)
     medications: Optional[list[str]] = Field(None, max_items=20)

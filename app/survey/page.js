@@ -187,18 +187,29 @@ export default function SurveyPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await fetch("/api/profile", {
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      
+      const response = await fetch("/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(profile),
       });
-      // Save to localStorage as well for offline access
-      localStorage.setItem("campusfuel_profile", JSON.stringify(profile));
-      router.push("/ai");
-    } catch {
+
+      if (response.ok) {
+        // Save to localStorage as cache (will be user-specific via profile fetch)
+        localStorage.setItem("campusfuel_profile", JSON.stringify(profile));
+        router.push("/ai");
+      } else {
+        throw new Error("Failed to save profile");
+      }
+    } catch (err) {
+      console.error("Profile save error:", err);
       setError("Failed to save your profile. Please try again.");
       setLoading(false);
     }
