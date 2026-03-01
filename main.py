@@ -201,6 +201,7 @@ async def healthos_exception_handler(request: Request, exc: HealthOSAPIError):
 
 health_checker = None
 perf_metrics = None
+churn_predictor = None
 
 try:
     from monitoring import HealthCheck, PerformanceMetrics, capture_exception
@@ -210,6 +211,14 @@ try:
 except ImportError:
     MONITORING_ENABLED = False
     logger.warning("Monitoring module not available")
+
+# Import churn prediction model
+try:
+    from churn_prediction import churn_predictor as _churn_predictor
+    churn_predictor = _churn_predictor
+    logger.info("✓ Churn prediction model loaded")
+except ImportError as e:
+    logger.warning(f"Churn prediction module not available: {e}")
 
 # Register health checks
 if MONITORING_ENABLED and health_checker:
@@ -793,6 +802,163 @@ async def save_profile(request: Request):
                 "error": "Internal server error",
                 "error_code": "INTERNAL_SERVER_ERROR",
             },
+            status_code=500,
+        )
+
+# ══════════════════════════════════════════════
+# CHURN PREDICTION ENDPOINTS
+# ══════════════════════════════════════════════
+
+@app.post(
+    "/api/churn-risk",
+    tags=["Churn Prediction"],
+    summary="Predict user churn risk",
+    description="Predict likelihood of user churn based on engagement metrics",
+)
+async def predict_churn(request: Request):
+    """Predict churn risk for a user.
+    
+    Expected JSON payload:
+    {
+        "user_id": "user_123",
+        "last_login": "2024-02-15T10:30:00",
+        "login_history": [...],
+        "total_goals": 5,
+        "completed_goals": 3,
+        "total_meals": 30,
+        "adhered_meals": 24,
+        "feedback_count": 8,
+        "days_since_signup": 90,
+        "activity_days": 60,
+        "profile_completion_percent": 85,
+        "health_check_count": 15
+    }
+    """
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        # Get request body
+        body = await request.json()
+        
+        if not churn_predictor:
+            return JSONResponse(
+                {"success": False, "error": "Churn prediction model not available", "error_code": "SERVICE_UNAVAILABLE"},
+                status_code=503,
+            )
+        
+        # Predict churn
+        result = churn_predictor.predict(body)
+        
+        return JSONResponse({
+            "success": True,
+            "data": result.to_dict()
+        }, status_code=200)
+    
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Churn prediction error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.get(
+    "/api/churn-risk/{user_id}",
+    tags=["Churn Prediction"],
+    summary="Get user churn risk",
+    description="Get stored churn risk for a specific user",
+)
+async def get_user_churn_risk(user_id: str, request: Request):
+    """Get churn risk for specific user from database.
+    
+    In a production system, this would fetch pre-calculated churn scores
+    from the churn_features table in Supabase.
+    """
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+        
+        # In production, query Supabase:
+        # result = _sb.table("churn_features").select("*").eq("user_id", user_id).execute()
+        # if result.data:
+        #     return JSONResponse({"success": True, "data": result.data[0]})
+        
+        return JSONResponse(
+            {"success": False, "error": "User not found", "error_code": "NOT_FOUND"},
+            status_code=404,
+        )
+    except Exception as e:
+        logger.error(f"Get churn risk error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.get(
+    "/api/churn-risk/cohort",
+    tags=["Churn Prediction"],
+    summary="Get at-risk user cohort",
+    description="Get list of users at risk of churn above threshold",
+)
+async def get_at_risk_cohort(threshold: float = 0.5, request: Request = None):
+    """Get cohort of users at risk of churn.
+    
+    Parameters:
+    - threshold: Churn probability threshold (0.0-1.0), default 0.5
+    
+    In production, this would query Supabase:
+    SELECT * FROM churn_features WHERE churn_risk_score >= threshold
+    ORDER BY churn_risk_score DESC
+    """
+    try:
+        if request:
+            payload = _decode_token(request)
+            if not payload:
+                return JSONResponse(
+                    {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                    status_code=401,
+                )
+        
+        if threshold < 0 or threshold > 1:
+            return JSONResponse(
+                {"success": False, "error": "Threshold must be between 0 and 1", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+        
+        # In production:
+        # result = _sb.table("churn_features") \
+        #     .select("*") \
+        #     .gte("churn_risk_score", threshold) \
+        #     .order("churn_risk_score", desc=True) \
+        #     .execute()
+        # return JSONResponse({"success": True, "data": result.data})
+        
+        return JSONResponse({
+            "success": True,
+            "data": [],
+            "threshold": threshold,
+            "count": 0
+        }, status_code=200)
+    
+    except Exception as e:
+        logger.error(f"Get at-risk cohort error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
             status_code=500,
         )
 
