@@ -85,23 +85,23 @@ const STEPS = [
   {
     key: "class_schedule",
     emoji: "📅",
-    question: "What's your class schedule?",
-    type: "text",
-    placeholder: "e.g. MWF 8am–2pm, TTh 10am–4pm",
+    question: "What days do you have class?",
+    type: "daypicker",
+    hint: "Tap all days you have classes",
   },
   {
     key: "sleep_schedule",
     emoji: "😴",
-    question: "When do you sleep and wake up?",
-    type: "text",
-    placeholder: "e.g. 11pm–7am or 2am–9am",
+    question: "When do you sleep and how long?",
+    type: "sleeppicker",
+    bedTimes: ["8pm","9pm","10pm","11pm","12am","1am","2am","3am"],
+    sleepDurations: ["4 hrs","5 hrs","6 hrs","7 hrs","8 hrs","9 hrs","10 hrs"],
   },
   {
     key: "workout_times",
     emoji: "🏋️",
     question: "When do you work out?",
-    type: "text",
-    placeholder: "e.g. MWF 5pm — or 'none'",
+    type: "workoutpicker",
   },
   {
     key: "stress_level",
@@ -172,7 +172,7 @@ export default function SurveyPage() {
     if (q.type === "daypicker") {
       val = selectedDays.length > 0 ? selectedDays.join(", ") : "";
     } else if (q.type === "sleeppicker") {
-      val = bedTime && wakeTime ? `sleep ${bedTime}, wake ${wakeTime}` : "";
+      val = bedTime && wakeTime ? `sleep ${bedTime} for ${wakeTime}` : "";
     } else if (q.type === "workoutpicker") {
       if (workoutSlot === "i don't work out") val = "none";
       else val = workoutDays.length > 0 && workoutSlot ? `${workoutDays.join(", ")} – ${workoutSlot}` : "";
@@ -196,7 +196,7 @@ export default function SurveyPage() {
       if (nextType === "daypicker") {
         setSelectedDays(saved ? saved.split(", ") : []);
       } else if (nextType === "sleeppicker") {
-        const m = saved.match(/sleep (.+), wake (.+)/);
+        const m = saved.match(/sleep (.+) for (.+)/);
         setBedTime(m ? m[1] : ""); setWakeTime(m ? m[2] : "");
       } else if (nextType === "workoutpicker") {
         if (saved === "none") { setWorkoutDays([]); setWorkoutSlot("i don't work out"); }
@@ -220,7 +220,7 @@ export default function SurveyPage() {
     if (prevType === "daypicker") {
       setSelectedDays(saved ? saved.split(", ") : []);
     } else if (prevType === "sleeppicker") {
-      const m = saved.match(/sleep (.+), wake (.+)/);
+      const m = saved.match(/sleep (.+) for (.+)/);
       setBedTime(m ? m[1] : ""); setWakeTime(m ? m[2] : "");
     } else if (prevType === "workoutpicker") {
       if (saved === "none") { setWorkoutDays([]); setWorkoutSlot("i don't work out"); }
@@ -404,23 +404,23 @@ export default function SurveyPage() {
                 </div>
                 <div className={styles.sleepDivider} />
                 <div className={styles.sleepGroup}>
-                  <span className={styles.sleepLabel}>☀️ Wake up</span>
+                  <span className={styles.sleepLabel}>⏰ How long?</span>
                   <div className={styles.timeGrid}>
-                    {q.wakeTimes.map((t) => (
+                    {q.sleepDurations.map((d) => (
                       <button
-                        key={t}
+                        key={d}
                         type="button"
-                        className={`${styles.timeBtn} ${wakeTime === t ? styles.timeBtnOn : ""}`}
-                        onClick={() => setWakeTime(t)}
+                        className={`${styles.timeBtn} ${wakeTime === d ? styles.timeBtnOn : ""}`}
+                        onClick={() => setWakeTime(d)}
                       >
-                        {t}
+                        {d}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
               {bedTime && wakeTime && (
-                <p className={styles.pickerSummary}>😴 Sleep {bedTime} → Wake {wakeTime}</p>
+                <p className={styles.pickerSummary}>😴 {bedTime} · {wakeTime}</p>
               )}
             </div>
           )}
