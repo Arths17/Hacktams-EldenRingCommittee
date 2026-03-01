@@ -915,7 +915,7 @@ async def get_user_churn_risk(user_id: str, request: Request):
     summary="Get at-risk user cohort",
     description="Get list of users at risk of churn above threshold",
 )
-async def get_at_risk_cohort(threshold: float = 0.5, request: Request = None):
+async def get_at_risk_cohort(threshold: float = 0.5, request: Optional[Request] = None):
     """Get cohort of users at risk of churn.
     
     Parameters:
@@ -1021,11 +1021,11 @@ async def chat(request: Request):
             """Generate chat response stream."""
             try:
                 import ollama
-                from model import MODEL_NAME, build_full_context
-                from constraint_graph import ConstraintGraph
-                from validation import parse_profile as _parse_profile
-                from meal_swap import detect_swap_request, find_swaps, format_swap_block
-                import nutrition_db, user_state
+                from model.model import MODEL_NAME, build_full_context
+                from model.constraint_graph import ConstraintGraph
+                from model.validation import parse_profile as _parse_profile
+                from model.meal_swap import detect_swap_request, find_swaps, format_swap_block
+                from model import nutrition_db, user_state
                 
                 _profile = _cast(dict, profile) if profile else {}
                 system_full, seed_message = build_full_context(_profile, username)
