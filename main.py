@@ -58,29 +58,58 @@ except Exception as e:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
 
 # Import exceptions and models (with graceful fallback)
+# Define fallback classes first
+class HealthOSAPIError(Exception):
+    """Base exception class."""
+    def to_response(self):
+        return JSONResponse({"success": False, "error": str(self)}, status_code=400)
+
+class ValidationError(HealthOSAPIError):
+    """Validation error."""
+    pass
+
+class InternalServerError(HealthOSAPIError):
+    """Internal server error."""
+    pass
+
+def get_rate_limiter():
+    """Fallback rate limiter."""
+    class FallbackRateLimiter:
+        def check_rate_limit(self, request, endpoint, username=None):
+            pass
+    return FallbackRateLimiter()
+
+# Try to import actual implementations
 try:
     from api_exceptions import (
-        HealthOSAPIError,
+        HealthOSAPIError as _HealthOSAPIError,
         AuthenticationError,
         AuthorizationError,
-        ValidationError,
+        ValidationError as _ValidationError,
         ResourceNotFoundError,
         RateLimitError,
         ConflictError,
-        InternalServerError,
+        InternalServerError as _InternalServerError,
         ExternalServiceError,
     )
     from api_models import AuthResponse, UserResponse, ErrorResponse
-    from rate_limiter import get_rate_limiter
+    from rate_limiter import get_rate_limiter as _get_rate_limiter
+    
+    # Use imported versions
+    HealthOSAPIError = _HealthOSAPIError  # type: ignore
+    ValidationError = _ValidationError  # type: ignore
+    InternalServerError = _InternalServerError  # type: ignore
+    get_rate_limiter = _get_rate_limiter  # type: ignore
     USE_API_UTILS = True
 except ImportError as e:
     logger.warning(f"API utilities not available: {e} (using basic error handling)")
     USE_API_UTILS = False
-    
-    # Minimal fallback classes
-    class HealthOSAPIError(Exception):
-        def to_response(self):
-            return JSONResponse({"success": False, "error": str(self)}, status_code=400)
+    AuthenticationError = HealthOSAPIError  # type: ignore
+    AuthorizationError = HealthOSAPIError  # type: ignore
+    ResourceNotFoundError = HealthOSAPIError  # type: ignore
+    RateLimitError = HealthOSAPIError  # type: ignore
+    ConflictError = HealthOSAPIError  # type: ignore
+    ExternalServiceError = HealthOSAPIError  # type: ignore
 
 # ══════════════════════════════════════════════
 # APP SETUP
@@ -107,6 +136,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request/response logging middleware
+import time
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    """Log all HTTP requests and responses with structured JSON."""
+    
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        
+        try:
+            from structured_logging import logger as struct_logger
+            struct_logger.log_request(request.method, request.url.path)
+            logger_available = True
+        except ImportError:
+            logger_available = False
+        
+        response = await call_next(request)
+        
+        if logger_available:
+            elapsed_ms = (time.time() - start_time) * 1000
+            from structured_logging import logger as struct_logger
+            struct_logger.log_response(response.status_code, elapsed_ms)
+        
+        return response
+
+app.add_middleware(LoggingMiddleware)
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
@@ -139,8 +196,84 @@ async def healthos_exception_handler(request: Request, exc: HealthOSAPIError):
     return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
 # ══════════════════════════════════════════════
-# HELPER FUNCTIONS
+# MONITORING & HEALTH CHECKS
 # ══════════════════════════════════════════════
+
+health_checker = None
+perf_metrics = None
+
+try:
+    from monitoring import HealthCheck, PerformanceMetrics, capture_exception
+    health_checker = HealthCheck()
+    perf_metrics = PerformanceMetrics()
+    MONITORING_ENABLED = True
+except ImportError:
+    MONITORING_ENABLED = False
+    logger.warning("Monitoring module not available")
+
+# Register health checks
+if MONITORING_ENABLED and health_checker:
+    # Supabase health check
+    def check_supabase() -> tuple[bool, dict]:
+        """Check Supabase connectivity."""
+        if not USE_SUPABASE:
+            return False, {"status": "not_configured"}
+        try:
+            _sb.table("users").select("id").limit(1).execute()
+            return True, {"status": "connected"}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    # Ollama health check
+    def check_ollama() -> tuple[bool, dict]:
+        """Check Ollama connectivity."""
+        try:
+            import requests
+            resp = requests.get("http://localhost:11434/api/tags", timeout=2)
+            return resp.status_code == 200, {"status": "connected"}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    # ChromaDB health check
+    def check_chromadb() -> tuple[bool, dict]:
+        """Check ChromaDB availability."""
+        try:
+            import chromadb
+            db = chromadb.PersistentClient(path="model/chroma_db")
+            collections = db.list_collections()
+            return True, {"status": "connected", "collections": len(collections)}
+        except Exception as e:
+            return False, {"status": "disconnected", "error": str(e)}
+    
+    health_checker.register("supabase", check_supabase, critical=True)
+    health_checker.register("ollama", check_ollama, critical=True)
+    health_checker.register("chromadb", check_chromadb, critical=False)
+
+@app.get("/health", tags=["monitoring"])
+async def health_check_endpoint():
+    """System health check endpoint.
+    
+    Returns comprehensive health status of all critical services.
+    Used by load balancers and monitoring systems.
+    """
+    if MONITORING_ENABLED and health_checker:
+        status = await health_checker.run_all()
+        status_code = 200 if status["healthy"] else 503
+        return JSONResponse(status, status_code=status_code)
+    return JSONResponse({
+        "healthy": True,
+        "services": {"basic": {"healthy": True}},
+    }, status_code=200)
+
+@app.get("/metrics", tags=["monitoring"])
+def metrics_endpoint():
+    """Performance metrics endpoint.
+    
+    Returns API performance statistics (requests, response times, error rates).
+    """
+    if MONITORING_ENABLED and perf_metrics:
+        return JSONResponse(perf_metrics.get_summary())
+    return JSONResponse({"message": "Metrics not available"})
 
 def _make_token(username: str, user_id: Optional[str] = None) -> str:
     """Create JWT token for user."""
@@ -180,17 +313,16 @@ def _decode_token(request: Request) -> Optional[dict]:
 def _validate_username(username: str) -> None:
     """Validate username format."""
     if not (3 <= len(username) <= 50):
-        raise ValidationError("Username must be 3-50 characters", field="username")
+        raise ValidationError("Username must be 3-50 characters")
     if not re.match(r"^[a-zA-Z0-9_-]+$", username):
         raise ValidationError(
-            "Username must contain only letters, numbers, hyphen, underscore",
-            field="username"
+            "Username must contain only letters, numbers, hyphen, underscore"
         ) if USE_API_UTILS else ValueError("Invalid username format")
 
 def _validate_password(password: str) -> None:
     """Validate password strength."""
     if not (8 <= len(password) <= 128):
-        raise ValidationError("Password must be 8-128 characters", field="password")
+        raise ValidationError("Password must be 8-128 characters")
 
 def _local_login(username: str, password: str) -> tuple[bool, Optional[str], Optional[str]]:
     """Local file-based login (fallback)."""
@@ -440,7 +572,7 @@ async def signup(
             _validate_username(username)
             _validate_password(password)
             if password != password_confirm:
-                raise ValidationError("Passwords do not match", field="password_confirm")
+                raise ValidationError("Passwords do not match")
         except Exception as e:
             logger.warning(f"Signup validation failed: {e}")
             if USE_API_UTILS and isinstance(e, ValidationError):
@@ -463,7 +595,10 @@ async def signup(
                     "password": hashed,
                 }).execute()
                 
-                uid = (res.data[0] or {}).get("id") if res.data else None
+                uid: Optional[str] = None
+                if res.data:
+                    user_row = _cast(dict, res.data[0])
+                    uid = _cast(Optional[str], user_row.get("id"))
                 token = _make_token(username, uid)
                 logger.info(f"✓ Signup successful: {username} (Supabase)")
                 return JSONResponse({
