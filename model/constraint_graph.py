@@ -259,38 +259,79 @@ class ConstraintGraph:
         return bool(self._critical_flags)
 
     def to_prompt_block(self) -> str:
-        """Format the full constraint graph state for injection into the AI prompt."""
-        pp    = self.profile
+        """
+        Generate explicit LLM-directive constraint block for injection at the
+        TOP of the system prompt.  Uses imperative language so the model treats
+        these as hard rules, not suggestions.
+        """
+        pp = self.profile
+
         lines = [
-            "\n══ CONSTRAINT GRAPH  (single source of truth) ══",
-            f"  diet_type     : {pp.diet_type.value}",
-            f"  goal          : {pp.goal.value}",
-            f"  stress_state  : {pp.stress_state.value} ({pp.stress_level}/10)",
-            f"  energy_state  : {pp.energy_state.value} ({pp.energy_level}/10)",
-            f"  sleep_quality : {pp.sleep_quality.value}"
-            + (f" ({pp.sleep_hours}h)" if pp.sleep_hours else ""),
-            f"  mood_state    : {pp.mood_state.value}",
-            f"  budget_tier   : {pp.budget_tier.value}",
-            f"  kitchen       : {pp.kitchen_access.value}",
+            "",
+            "╔══════════════════════════════════════════════════════════════╗",
+            "║  ⚠️  HARD USER CONSTRAINTS — ENFORCE BEFORE GENERATING ANYTHING  ║",
+            "╚══════════════════════════════════════════════════════════════╝",
         ]
+
+        # ── Diet + Allergens (identity block) ──────────────────────────────
+        diet_str = pp.diet_type.value.upper()
+        lines.append(f"  DIET TYPE : {diet_str}")
         if pp.allergens and AllergenType.NONE not in pp.allergens:
-            lines.append(
-                f"  allergens     : {', '.join(a.value for a in pp.allergens)}"
-            )
+            allergen_str = ", ".join(a.value.upper() for a in pp.allergens)
+            lines.append(f"  ALLERGENS : {allergen_str}")
+        else:
+            lines.append("  ALLERGENS : none")
+
+        # ── Absolute food prohibition ───────────────────────────────────────
         if self._forbidden_keywords:
-            sample = sorted(self._forbidden_keywords)[:10]
-            suffix = "…" if len(self._forbidden_keywords) > 10 else ""
-            lines.append(
-                f"  forbidden_kw  : [{', '.join(sample)}{suffix}]"
-                f"  ({len(self._forbidden_keywords)} total)"
-            )
+            all_kw = sorted(self._forbidden_keywords)
+            # Wrap into rows of 8 for readability
+            rows   = [all_kw[i:i+8] for i in range(0, len(all_kw), 8)]
+            lines += [
+                "",
+                "  🚫 ABSOLUTE FOOD PROHIBITIONS",
+                "     The following foods/ingredients MUST NEVER appear in any",
+                "     recommendation, meal plan, recipe, snack list, food example,",
+                "     or substitution suggestion — even as 'for others' options:",
+                "",
+            ]
+            for row in rows:
+                lines.append("     " + ",  ".join(row))
+            lines += [
+                "",
+                "     If a food CONTAINS, IS MADE FROM, or IS DERIVED FROM any",
+                "     of the above, it is also FORBIDDEN.",
+            ]
+
+        # ── Critical health state flags ─────────────────────────────────────
         if self._critical_flags:
-            lines.append("  🔴 CRITICAL FLAGS:")
+            lines += [
+                "",
+                "  🔴 CRITICAL HEALTH STATES — ADDRESS THESE FIRST:",
+            ]
             for flag in self._critical_flags:
                 lines.append(f"     • {flag}")
-        lines.append(
-            f"  active_protocols: {', '.join(self._active_protocols[:7])}"
-            + ("…" if len(self._active_protocols) > 7 else "")
-        )
-        lines.append("══════════════════════════════════════════════")
+
+        # ── Active protocols ────────────────────────────────────────────────
+        lines += [
+            "",
+            "  🎯 ACTIVE PROTOCOLS (priority order):",
+            "     " + ",  ".join(self._active_protocols),
+        ]
+
+        # ── Context summary ─────────────────────────────────────────────────
+        lines += [
+            "",
+            "  📋 USER CONTEXT:",
+            f"     goal={pp.goal.value}  |  "
+            f"stress={pp.stress_level}/10  |  "
+            f"energy={pp.energy_level}/10  |  "
+            f"sleep={pp.sleep_quality.value}"
+            + (f" ({pp.sleep_hours}h)" if pp.sleep_hours else ""),
+            f"     budget={pp.budget_tier.value}  |  kitchen={pp.kitchen_access.value}",
+            "",
+            "╚══════════════════════════════════════════════════════════════╝",
+            "",
+        ]
+
         return "\n".join(lines)

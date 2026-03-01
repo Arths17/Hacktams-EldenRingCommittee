@@ -763,15 +763,15 @@ def build_full_context(profile: dict, username: str) -> tuple[str, str]:
         seed_query, active_protocols[:5], n=15, constraint_graph=cg
     )
     if not nutrition_ctx:
-        nutrition_ctx = nutrition_db.build_nutrition_context(profile)
+        nutrition_ctx = nutrition_db.build_nutrition_context(profile, constraint_graph=cg)
 
     # ── Stage 7: Research context ───────────────────────────────
     research_ctx = load_research_context()
 
     # ── Stage 8: Assemble ───────────────────────────────────────
-    # Inject constraint graph block between system prompt and research context
+    # Constraint block goes FIRST so it is the first instruction the LLM reads.
     constraint_block = cg.to_prompt_block()
-    system_full      = SYSTEM_PROMPT + constraint_block + research_ctx
+    system_full      = constraint_block + SYSTEM_PROMPT + research_ctx
     seed_message     = profile_to_context(
         profile, analysis, priority_block, nutrition_ctx, memory_ctx
     )
@@ -824,6 +824,14 @@ def main():
 
     user_name = profile.get("name", "default")
 
+    # ── Stage 0: Build constraint graph (single source of truth) ──────────
+    from validation import parse_profile as _parse_profile
+    from constraint_graph import ConstraintGraph as _CG
+
+    _pp = _parse_profile(profile)
+    _cg = _CG.from_parsed_profile(_pp)
+    _constraint_block = _cg.to_prompt_block()
+
     # ── Optional daily check-in (returning users, first visit of the day) ─────
     _prev_logs = session_memory.load_recent_logs(user_name)
     _today     = datetime.now().strftime("%Y-%m-%d")
@@ -875,7 +883,11 @@ def main():
 
     # ── RAG: top-15 semantically relevant foods for this user's goals ────
     seed_query    = "personalized health plan " + " ".join(state.get("goals", []))
-    nutrition_ctx = rag.query(seed_query, [p for p, _ in prioritized[:5]], n=15)
+    nutrition_ctx = rag.query(
+        seed_query, [p for p, _ in prioritized[:5]], n=15, constraint_graph=_cg
+    )
+    if not nutrition_ctx:
+        nutrition_ctx = nutrition_db.build_nutrition_context(profile, constraint_graph=_cg)
 
     # ── Research context (sleep + student MH stats) ─────────────
     research_ctx = load_research_context()
@@ -883,7 +895,8 @@ def main():
         print("  📊  Research context loaded (sleep + mental health data)")
 
     # Build conversation history (Ollama multi-turn)
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + research_ctx}]
+    # Constraint block is FIRST so it is the first thing the LLM reads
+    messages: list[dict] = [{"role": "system", "content": _constraint_block + SYSTEM_PROMPT + research_ctx}]
 
     # Seed with profile + analysis + memory + priority block + RAG nutrition
     seed_message = profile_to_context(profile, analysis, priority_block, nutrition_ctx, memory_ctx)
@@ -956,7 +969,8 @@ def main():
             print(f"  📊  Feedback recorded {feedback} — top protocols: [{top_3}]\n")
 
         # RAG: fetch foods relevant to this specific follow-up query
-        _rag_ctx = rag.query(user_input, [p for p, _ in prioritized[:5]], n=8)
+        _rag_ctx = rag.query(user_input, [p for p, _ in prioritized[:5]], n=8,
+                             constraint_graph=_cg)
         _send    = (
             f"[Relevant nutrition data for this query:{_rag_ctx}]\n\n{user_input}"
             if _rag_ctx else user_input

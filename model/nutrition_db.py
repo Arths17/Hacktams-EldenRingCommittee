@@ -422,10 +422,14 @@ def _threshold_summary(profile: dict) -> str:
 # ══════════════════════════════════════════════
 # MAIN CONTEXT BUILDER
 # ══════════════════════════════════════════════
-def build_nutrition_context(profile: dict) -> str:
+def build_nutrition_context(profile: dict, constraint_graph=None) -> str:
     """
     Builds the full nutrition knowledge block injected into the AI seed message.
     Includes: gap analysis, threshold context, scaled per-serving food lists.
+
+    constraint_graph: optional ConstraintGraph — when provided, every food record
+    is passed through allows_food() before being included.  Falls back to the
+    legacy DIY vegetarian keyword filter when constraint_graph is None.
     """
     if not _loaded:
         return ""
@@ -437,9 +441,18 @@ def build_nutrition_context(profile: dict) -> str:
     diet    = (profile.get("diet_type") or "omnivore").lower()
     mood    = (profile.get("mood") or "neutral").lower()
 
+    # Legacy fallback filter (used only when no constraint_graph is available)
     is_veg  = "vegan" in diet or "vegetarian" in diet
     meat_kw = ["chicken", "beef", "pork", "turkey", "salmon", "tuna",
                "fish", "lamb", "bacon", "shrimp", "crab"]
+
+    def _food_allowed(f: dict) -> bool:
+        """Single gate: use constraint_graph when available, else DIY veg filter."""
+        if constraint_graph is not None:
+            return constraint_graph.allows_food(f)
+        if is_veg:
+            return not any(kw in f.get("name", "").lower() for kw in meat_kw)
+        return True
 
     lines = [
         "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -501,10 +514,8 @@ def build_nutrition_context(profile: dict) -> str:
         if not foods_100g:
             continue
 
-        # Vegetarian/vegan filter
-        if is_veg:
-            foods_100g = [f for f in foods_100g
-                          if not any(kw in f.get("name", "").lower() for kw in meat_kw)]
+        # Unified constraint filter (constraint_graph → falls back to DIY veg filter)
+        foods_100g = [f for f in foods_100g if _food_allowed(f)]
 
         # Scale to real portions
         foods_scaled = [scale_to_portion(f) for f in foods_100g[:6]]
