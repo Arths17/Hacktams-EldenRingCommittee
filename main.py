@@ -4,6 +4,7 @@ import sys
 import json
 import bcrypt
 import jwt as _jwt
+from typing import cast as _cast
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -94,7 +95,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
         try:
             res = _sb.table("users").select("*").eq("username", username).execute()
             if res.data:
-                row = res.data[0]
+                row = _cast(dict, res.data[0])
                 if bcrypt.checkpw(password.encode(), row["password"].encode()):
                     token = _make_token(username, row["id"])
                     return JSONResponse({"success": True, "token": token})
@@ -117,7 +118,7 @@ async def signup(username: str = Form(...), password: str = Form(...)):
                 return JSONResponse({"success": False, "error": "Username already taken"})
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
             res = _sb.table("users").insert({"username": username, "password": hashed}).execute()
-            uid = res.data[0]["id"] if res.data else None
+            uid = (res.data[0] or {}).get("id") if res.data else None  # type: ignore[union-attr]
             return JSONResponse({"success": True, "token": _make_token(username, uid)})
         except Exception:
             pass
@@ -217,15 +218,16 @@ async def chat(request: Request):
             from meal_swap import detect_swap_request, find_swaps, format_swap_block
             import nutrition_db, rag, user_state
 
-            system_full, seed_message = build_full_context(profile, username)
+            _profile: dict = _cast(dict, profile) if profile else {}
+            system_full, seed_message = build_full_context(_profile, username)
 
             # ── Meal swap injection ────────────────────────────────────
             _swap_prefix = ""
             _rejected = detect_swap_request(message)
             if _rejected and nutrition_db.is_loaded():
-                _pp = _parse_profile(profile)
+                _pp = _parse_profile(_profile)
                 _cg = ConstraintGraph.from_parsed_profile(_pp)
-                _state       = user_state.analyze_user_state(profile)
+                _state       = user_state.analyze_user_state(_profile)
                 _protocols   = user_state.map_state_to_protocols(_state)
                 _prioritized = user_state.prioritize_protocols(_protocols, _state, {})
                 _active_p    = [p for p, _ in _prioritized[:5]]
