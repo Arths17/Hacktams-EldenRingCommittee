@@ -109,33 +109,31 @@
   animation: fadeIn 0.4s ease;
 }
 
-/* Progress */
-.progressTrack {
+/* Pill progress bar */
+.pillBar {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  margin-bottom: 8px;
   width: 100%;
-  height: 4px;
-  background: var(--border);
-  position: relative;
-  overflow: hidden;
 }
 
-.progressTrack::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(20, 90, 50, 0.3), transparent);
-  animation: shimmer 2s infinite;
+.pill {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(20, 90, 50, 0.15);
+  transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease;
 }
 
-.progressFill {
-  height: 100%;
+.pillDone {
   background: var(--green);
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  z-index: 1;
-  box-shadow: 0 0 10px rgba(20, 90, 50, 0.5);
+}
+
+.pillActive {
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(201, 155, 76, 0.5);
+  transform: scaleY(1.4);
 }
 
 /* Card */

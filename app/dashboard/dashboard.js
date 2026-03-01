@@ -192,7 +192,7 @@ export default function DashboardPage() {
   const [goals, setGoals] = useState({ calorieGoal: 2400, proteinG: 150, carbsG: 300, fatG: 65, waterGlasses: 8 });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     fetch("/api/me", {
       headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
@@ -396,6 +396,11 @@ export default function DashboardPage() {
 
         </div>
       </div>
+      {/* Page Footer */}
+      <footer className={styles.pageFooter}>
+        <span>🌿 CampusFuel</span>
+        <span>© 2026 · Built for students, by students.</span>
+      </footer>
     </div>
   );
 }
