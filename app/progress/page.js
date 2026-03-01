@@ -9,7 +9,7 @@ import styles from "./progress.module.css";
 
 export default function ProgressPage() {
   const router = useRouter();
-  const { user, userProfile, weeklyMeals, mealsLoading, fetchWeeklyMeals, activityMetrics } = useApp();
+  const { user, userProfile, weeklyMeals, mealsLoading, fetchWeeklyMeals, activityMetrics, workouts, fetchWorkouts } = useApp();
   
   const [timeRange, setTimeRange] = useState("week"); // week, month, year
   const [churnRisk, setChurnRisk] = useState(null);
@@ -18,6 +18,7 @@ export default function ProgressPage() {
     // Fetch weekly meals data when component mounts
     if (user) {
       fetchWeeklyMeals();
+      fetchWorkouts();
     }
   }, [user]);
 
@@ -25,11 +26,12 @@ export default function ProgressPage() {
   const weeklyData = weeklyMeals.map((dayData) => {
     const date = new Date(dayData.date);
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const workoutCount = workouts.filter((workout) => workout.date === dayData.date).length;
     return {
       day: dayNames[date.getDay()],
       calories: dayData.calories,
       protein: dayData.protein,
-      workouts: 0 // Placeholder for future workout tracking
+      workouts: workoutCount
     };
   });
 
@@ -61,6 +63,10 @@ export default function ProgressPage() {
 
           {/* Summary Stats */}
           <div className={styles.summaryGrid}>
+            {mealsLoading ? (
+              Array.from({ length: 4 }).map((_, idx) => <div key={idx} className={styles.statSkeleton} />)
+            ) : (
+              <>
             <div className={styles.statCard}>
               <span className={styles.statIcon}>📅</span>
               <div className={styles.statInfo}>
@@ -89,6 +95,8 @@ export default function ProgressPage() {
                 <p className={styles.statValue}>{totalWorkouts} this week</p>
               </div>
             </div>
+              </>
+            )}
           </div>
 
           {/* Charts Section */}
@@ -119,7 +127,12 @@ export default function ProgressPage() {
               </div>
               <div className={styles.chart}>
                 {mealsLoading ? (
-                  <div className={styles.chartNote}>Loading weekly data...</div>
+                  Array.from({ length: 7 }).map((_, idx) => (
+                    <div key={idx} className={styles.barGroup}>
+                      <div className={styles.barContainer}><div className={styles.barSkeleton} /></div>
+                      <span className={styles.barLabel}>•</span>
+                    </div>
+                  ))
                 ) : weeklyData.length === 0 ? (
                   <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
                 ) : (
@@ -144,7 +157,12 @@ export default function ProgressPage() {
               <h2 className={styles.chartTitle}>💪 Protein Intake</h2>
               <div className={styles.chart}>
                 {mealsLoading ? (
-                  <div className={styles.chartNote}>Loading weekly data...</div>
+                  Array.from({ length: 7 }).map((_, idx) => (
+                    <div key={idx} className={styles.barGroup}>
+                      <div className={styles.barContainer}><div className={styles.barSkeleton} /></div>
+                      <span className={styles.barLabel}>•</span>
+                    </div>
+                  ))
                 ) : weeklyData.length === 0 ? (
                   <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
                 ) : (

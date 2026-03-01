@@ -390,6 +390,40 @@ def _local_signup(username: str, password: str) -> tuple[bool, Optional[str], Op
         logger.error(f"Local signup error: {e}")
         return False, None, "Signup service unavailable"
 
+def _local_change_password(username: str, current_password: str, new_password: str) -> tuple[bool, Optional[str]]:
+    """Change password in local users.json store."""
+    try:
+        with open("users.json", "r") as f:
+            users = json.load(f)
+
+        updated = False
+        for user in users:
+            if user.get("username") == username:
+                if not bcrypt.checkpw(current_password.encode(), user["password"].encode()):
+                    return False, "Current password is incorrect"
+                user["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                updated = True
+                break
+
+        if not updated:
+            return False, "User not found"
+
+        with open("users.json", "w") as f:
+            json.dump(users, f, indent=2)
+
+        return True, None
+    except FileNotFoundError:
+        return False, "No local users found"
+    except Exception as e:
+        logger.error(f"Local change password error: {e}")
+        return False, "Password update service unavailable"
+
+def _water_path(username: str) -> str:
+    return _profile_path(username).replace(".json", "_water.json")
+
+def _workouts_path(username: str) -> str:
+    return _profile_path(username).replace(".json", "_workouts.json")
+
 # ══════════════════════════════════════════════
 # HEALTH CHECK ENDPOINT
 # ══════════════════════════════════════════════
@@ -674,6 +708,385 @@ async def logout(request: Request):
     if payload:
         logger.info(f"✓ Logout: {payload.get('username')}")
     return JSONResponse({"success": True})
+
+
+@app.post(
+    "/api/change-password",
+    tags=["Auth"],
+    summary="Change password",
+    description="Change authenticated user's password",
+)
+async def change_password(request: Request):
+    """Change current user's password."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        body = await request.json()
+        username = payload["username"]
+        user_id = payload.get("user_id")
+
+        current_password = str(body.get("current_password", "")).strip()
+        new_password = str(body.get("new_password", "")).strip()
+        confirm_password = str(body.get("confirm_password", "")).strip()
+
+        if not current_password or not new_password:
+            return JSONResponse(
+                {"success": False, "error": "Current and new password are required", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+
+        if confirm_password and new_password != confirm_password:
+            return JSONResponse(
+                {"success": False, "error": "New passwords do not match", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+
+        _validate_password(new_password)
+
+        # Try Supabase first
+        if USE_SUPABASE:
+            try:
+                row = None
+                if user_id:
+                    res = _sb.table("users").select("id,username,password").eq("id", user_id).execute()
+                    if res.data:
+                        row = _cast(dict, res.data[0])
+                if not row:
+                    res = _sb.table("users").select("id,username,password").eq("username", username).execute()
+                    if res.data:
+                        row = _cast(dict, res.data[0])
+
+                if row:
+                    if not bcrypt.checkpw(current_password.encode(), row["password"].encode()):
+                        return JSONResponse(
+                            {"success": False, "error": "Current password is incorrect", "error_code": "AUTH_FAILED"},
+                            status_code=401,
+                        )
+
+                    new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                    _sb.table("users").update({"password": new_hash}).eq("id", row.get("id")).execute()
+                    logger.info(f"✓ Password changed: {username} (Supabase)")
+                    return JSONResponse({"success": True})
+            except Exception as e:
+                logger.warning(f"Supabase password change failed: {e}, falling back to local")
+
+        ok, err = _local_change_password(username, current_password, new_password)
+        if not ok:
+            status_code = 401 if "incorrect" in (err or "").lower() else 400
+            return JSONResponse(
+                {"success": False, "error": err or "Failed to change password", "error_code": "PASSWORD_CHANGE_FAILED"},
+                status_code=status_code,
+            )
+
+        logger.info(f"✓ Password changed: {username} (local)")
+        return JSONResponse({"success": True})
+
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Change password error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.get(
+    "/api/water",
+    tags=["Hydration"],
+    summary="Get water intake",
+    description="Get user's water intake for a specific date",
+)
+async def get_water_intake(request: Request, date: Optional[str] = None):
+    """Get water intake for date (defaults to today)."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        day = date or datetime.utcnow().strftime("%Y-%m-%d")
+
+        if USE_SUPABASE and user_id:
+            try:
+                res = _sb.table("water_logs").select("glasses,date").eq("user_id", user_id).eq("date", day).execute()
+                glasses = 0
+                if res.data:
+                    entry = _cast(dict, res.data[0])
+                    glasses = int(entry.get("glasses") or 0)
+                return JSONResponse({"success": True, "date": day, "glasses": glasses})
+            except Exception as e:
+                logger.warning(f"Supabase water fetch failed: {e}, falling back to local")
+
+        try:
+            with open(_water_path(username), "r") as f:
+                water_map = json.load(f)
+        except FileNotFoundError:
+            water_map = {}
+
+        glasses = int(water_map.get(day, 0) or 0)
+        return JSONResponse({"success": True, "date": day, "glasses": glasses})
+
+    except Exception as e:
+        logger.error(f"Get water intake error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.post(
+    "/api/water",
+    tags=["Hydration"],
+    summary="Save water intake",
+    description="Save user's water intake for a specific date",
+)
+async def save_water_intake(request: Request):
+    """Save water intake for date."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        body = await request.json()
+
+        day = str(body.get("date") or datetime.utcnow().strftime("%Y-%m-%d"))
+        glasses = int(body.get("glasses", 0))
+        glasses = max(0, min(glasses, 30))
+
+        if USE_SUPABASE and user_id:
+            try:
+                existing = _sb.table("water_logs").select("id").eq("user_id", user_id).eq("date", day).execute()
+                if existing.data:
+                    _sb.table("water_logs").update({"glasses": glasses}).eq("user_id", user_id).eq("date", day).execute()
+                else:
+                    _sb.table("water_logs").insert({"user_id": user_id, "date": day, "glasses": glasses}).execute()
+                return JSONResponse({"success": True, "date": day, "glasses": glasses})
+            except Exception as e:
+                logger.warning(f"Supabase water save failed: {e}, falling back to local")
+
+        try:
+            with open(_water_path(username), "r") as f:
+                water_map = json.load(f)
+        except FileNotFoundError:
+            water_map = {}
+
+        water_map[day] = glasses
+        with open(_water_path(username), "w") as f:
+            json.dump(water_map, f, indent=2)
+
+        return JSONResponse({"success": True, "date": day, "glasses": glasses})
+
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Save water intake error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.get(
+    "/api/workouts",
+    tags=["Workouts"],
+    summary="Get workouts",
+    description="Get user's workout logs (optionally by date range)",
+)
+async def get_workouts(request: Request, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get workout logs."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+
+        if USE_SUPABASE and user_id:
+            try:
+                query = _sb.table("workouts").select("*").eq("user_id", user_id)
+                if start_date:
+                    query = query.gte("date", start_date)
+                if end_date:
+                    query = query.lte("date", end_date)
+                res = query.execute()
+                workouts_raw = res.data or []
+                workouts: list[dict] = [item for item in workouts_raw if isinstance(item, dict)]
+                workouts.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
+                return JSONResponse({"success": True, "workouts": workouts})
+            except Exception as e:
+                logger.warning(f"Supabase workouts fetch failed: {e}, falling back to local")
+
+        try:
+            with open(_workouts_path(username), "r") as f:
+                workouts = json.load(f)
+        except FileNotFoundError:
+            workouts = []
+
+        workouts = [w for w in workouts if isinstance(w, dict)]
+
+        if start_date:
+            workouts = [w for w in workouts if str(w.get("date", "")) >= start_date]
+        if end_date:
+            workouts = [w for w in workouts if str(w.get("date", "")) <= end_date]
+
+        workouts.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
+        return JSONResponse({"success": True, "workouts": workouts})
+
+    except Exception as e:
+        logger.error(f"Get workouts error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.post(
+    "/api/workouts",
+    tags=["Workouts"],
+    summary="Log workout",
+    description="Create a new workout log entry",
+)
+async def log_workout(request: Request):
+    """Log workout entry."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        body = await request.json()
+
+        workout_type = str(body.get("type", "")).strip()
+        duration = int(body.get("duration", 0) or 0)
+        if not workout_type or duration <= 0:
+            return JSONResponse(
+                {"success": False, "error": "Workout type and positive duration are required", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+
+        workout = {
+            "id": str(body.get("id") or uuid4()),
+            "type": workout_type,
+            "duration": duration,
+            "notes": str(body.get("notes", "")).strip(),
+            "date": str(body.get("date") or datetime.utcnow().strftime("%Y-%m-%d")),
+            "timestamp": str(body.get("timestamp") or datetime.utcnow().isoformat()),
+        }
+
+        if USE_SUPABASE and user_id:
+            try:
+                _sb.table("workouts").insert({**workout, "user_id": user_id}).execute()
+                return JSONResponse({"success": True, "workout": workout})
+            except Exception as e:
+                logger.warning(f"Supabase workout save failed: {e}, falling back to local")
+
+        try:
+            with open(_workouts_path(username), "r") as f:
+                workouts = json.load(f)
+        except FileNotFoundError:
+            workouts = []
+
+        workouts.append(workout)
+        with open(_workouts_path(username), "w") as f:
+            json.dump(workouts, f, indent=2)
+
+        return JSONResponse({"success": True, "workout": workout})
+
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Log workout error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.delete(
+    "/api/workouts/{workout_id}",
+    tags=["Workouts"],
+    summary="Delete workout",
+    description="Delete a workout log entry by id",
+)
+async def delete_workout(request: Request, workout_id: str):
+    """Delete workout entry."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+
+        if USE_SUPABASE and user_id:
+            try:
+                _sb.table("workouts").delete().eq("user_id", user_id).eq("id", workout_id).execute()
+                return JSONResponse({"success": True})
+            except Exception as e:
+                logger.warning(f"Supabase workout delete failed: {e}, falling back to local")
+
+        try:
+            with open(_workouts_path(username), "r") as f:
+                workouts = json.load(f)
+        except FileNotFoundError:
+            return JSONResponse(
+                {"success": False, "error": "Workout not found", "error_code": "NOT_FOUND"},
+                status_code=404,
+            )
+
+        filtered = [w for w in workouts if str(w.get("id")) != workout_id]
+        if len(filtered) == len(workouts):
+            return JSONResponse(
+                {"success": False, "error": "Workout not found", "error_code": "NOT_FOUND"},
+                status_code=404,
+            )
+
+        with open(_workouts_path(username), "w") as f:
+            json.dump(filtered, f, indent=2)
+
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        logger.error(f"Delete workout error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
 
 # ══════════════════════════════════════════════
 # PROFILE ENDPOINTS

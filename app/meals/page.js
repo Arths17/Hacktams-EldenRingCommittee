@@ -6,8 +6,76 @@ import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import styles from "./meals.module.css";
 
+function parseHeightToCm(h) {
+  if (!h) return 175;
+  const s = String(h).toLowerCase().trim();
+  const cmMatch = s.match(/(\d+\.?\d*)\s*cm/);
+  if (cmMatch) return parseFloat(cmMatch[1]);
+  const ftInMatch = s.match(/(\d+)['"ft\s]+(\d*)/);
+  if (ftInMatch) {
+    const ft = parseInt(ftInMatch[1]);
+    const ins = parseInt(ftInMatch[2] || 0);
+    return Math.round(ft * 30.48 + ins * 2.54);
+  }
+  const num = parseFloat(s);
+  if (!isNaN(num)) return num > 100 ? num : num * 30.48;
+  return 175;
+}
+
+function parseWeightToKg(w) {
+  if (!w) return 70;
+  const s = String(w).toLowerCase().trim();
+  const kgMatch = s.match(/(\d+\.?\d*)\s*kg/);
+  if (kgMatch) return parseFloat(kgMatch[1]);
+  const lbsMatch = s.match(/(\d+\.?\d*)\s*lb/);
+  if (lbsMatch) return parseFloat(lbsMatch[1]) * 0.453592;
+  const num = parseFloat(s);
+  if (!isNaN(num)) return num > 130 ? num * 0.453592 : num;
+  return 70;
+}
+
+function computeNutritionGoals(profile) {
+  const age = parseInt(profile?.age) || 20;
+  const gender = (profile?.gender || "").toLowerCase();
+  const heightCm = parseHeightToCm(profile?.height);
+  const weightKg = parseWeightToKg(profile?.weight);
+  const goal = (profile?.goal || "maintenance").toLowerCase();
+  const workouts = (profile?.workout_times || "").toLowerCase();
+
+  const bmrM = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  const bmrF = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const bmr = gender.includes("female") ? bmrF : gender.includes("male") ? bmrM : (bmrM + bmrF) / 2;
+
+  let activity = 1.2;
+  if (/[5-7]|daily|every/.test(workouts)) activity = 1.725;
+  else if (/[3-4]/.test(workouts)) activity = 1.55;
+  else if (workouts && workouts !== "none") activity = 1.375;
+
+  const tdee = bmr * activity;
+  const calorieGoal = goal.includes("fat loss") ? Math.round(tdee * 0.8) : goal.includes("muscle") ? Math.round(tdee * 1.1) : Math.round(tdee);
+
+  let protein;
+  let carbs;
+  let fat;
+  if (goal.includes("fat loss")) {
+    protein = Math.round((calorieGoal * 0.4) / 4);
+    carbs = Math.round((calorieGoal * 0.35) / 4);
+    fat = Math.round((calorieGoal * 0.25) / 9);
+  } else if (goal.includes("muscle")) {
+    protein = Math.round((calorieGoal * 0.3) / 4);
+    carbs = Math.round((calorieGoal * 0.5) / 4);
+    fat = Math.round((calorieGoal * 0.2) / 9);
+  } else {
+    protein = Math.round((calorieGoal * 0.25) / 4);
+    carbs = Math.round((calorieGoal * 0.5) / 4);
+    fat = Math.round((calorieGoal * 0.25) / 9);
+  }
+
+  return { calories: calorieGoal, protein, carbs, fat };
+}
+
 export default function MealsPage() {
-  const { user, todayMeals, mealsLoading, addMeal: addMealToContext, updateMeal: updateMealInContext, deleteMeal: deleteMealFromContext } = useApp();
+  const { user, userProfile, todayMeals, mealsLoading, addMeal: addMealToContext, updateMeal: updateMealInContext, deleteMeal: deleteMealFromContext } = useApp();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMealId, setEditingMealId] = useState(null);
@@ -103,18 +171,16 @@ export default function MealsPage() {
   };
 
   const handleDeleteMeal = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this meal?")) return;
     const result = await deleteMealFromContext(id);
     if (!result.success) {
       alert("Failed to delete meal: " + (result.error || "Unknown error"));
     }
   };
 
-  const goals = {
-    calories: 2400,
-    protein: 108,
-    carbs: 275,
-    fat: 90
-  };
+  const goals = userProfile && Object.keys(userProfile).length > 0
+    ? computeNutritionGoals(userProfile)
+    : { calories: 2400, protein: 108, carbs: 275, fat: 90 };
 
   const dailyProgress = {
     calories: Math.round((totalDailyNutrition.calories / goals.calories) * 100),
@@ -205,7 +271,11 @@ export default function MealsPage() {
           <div className={styles.mealsSection}>
             <h2 className={styles.mealsTitle}>Today&apos;s Meals</h2>
             {mealsLoading ? (
-              <p className={styles.noMeals}>Loading meals...</p>
+              <div className={styles.skeletonList}>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className={styles.skeletonCard} />
+                ))}
+              </div>
             ) : todayMeals.length === 0 ? (
               <p className={styles.noMeals}>No meals logged yet. Start by adding your first meal!</p>
             ) : (

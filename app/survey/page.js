@@ -318,7 +318,7 @@ export default function SurveyPage() {
       if (response.ok) {
         // Save to localStorage as cache (will be user-specific via profile fetch)
         localStorage.setItem("campusfuel_profile", JSON.stringify(profile));
-        router.push("/ai");
+        router.push("/dashboard");
       } else {
         // Get error details from response
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));

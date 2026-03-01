@@ -46,6 +46,18 @@
   flex-shrink: 0;
 }
 
+.mobileToggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
 .brandMark {
   width: 28px;
   height: 28px;
@@ -165,6 +177,24 @@
   transform: translateY(-1px);
 }
 
+.logoutBtn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
 /* Explicit link class (mirrors .navLinks a) */
 .navLink {
   color: rgba(255, 255, 255, 0.65);
@@ -217,4 +247,50 @@
 .themeToggle:hover {
   background: rgba(255, 255, 255, 0.16);
   transform: rotate(20deg) scale(1.1);
+}
+
+@media (max-width: 980px) {
+  .navbar {
+    padding: 10px 12px 0;
+  }
+
+  .navbarInner {
+    height: auto;
+    min-height: 52px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 10px 8px 14px;
+    gap: 10px;
+  }
+
+  .mobileToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    order: 2;
+  }
+
+  .navLinks,
+  .navActions {
+    display: none;
+    width: 100%;
+    justify-content: flex-start;
+    order: 3;
+    padding-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .navLinksOpen {
+    display: flex;
+  }
+
+  .navActionsOpen {
+    display: flex;
+    gap: 8px;
+  }
+
+  .navLink {
+    background: rgba(255, 255, 255, 0.06);
+  }
 }

@@ -184,18 +184,13 @@ function generateInsights(profile, goals) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, userProfile, todayMeals, weeklyMeals, mealsLoading } = useApp();
+  const { user, userProfile, todayMeals, weeklyMeals, mealsLoading, waterIntake, saveWaterIntake, fetchWaterIntake } = useApp();
   
   const [goals, setGoals] = useState({ calorieGoal: 2400, proteinG: 150, carbsG: 300, fatG: 65, waterGlasses: 8 });
-  const [waterGlasses, setWaterGlasses] = useState(6); // Track water intake
 
   useEffect(() => {
-    // Load water intake from localStorage
-    const savedWater = localStorage.getItem("waterIntake");
-    if (savedWater) {
-      setWaterGlasses(parseInt(savedWater));
-    }
-  }, []);
+    if (user?.token) fetchWaterIntake(user.token);
+  }, [user?.token]);
 
   useEffect(() => {
     // Update goals when profile changes
@@ -206,15 +201,14 @@ export default function DashboardPage() {
 
   const toggleWaterGlass = (index) => {
     let newWaterCount;
-    if (index < waterGlasses) {
+    if (index < waterIntake) {
       // Clicking a filled glass - unfill from that point
       newWaterCount = index;
     } else {
       // Clicking an empty glass - fill up to that point
       newWaterCount = index + 1;
     }
-    setWaterGlasses(newWaterCount);
-    localStorage.setItem("waterIntake", newWaterCount.toString());
+    saveWaterIntake(newWaterCount);
   };
 
   const displayName = userProfile?.name || user?.username || "there";
@@ -310,9 +304,13 @@ export default function DashboardPage() {
 
           {/* Stats Cards */}
           <div className={styles.statsGrid}>
-            {stats.map((s) => (
-              <StatsCard key={s.label} {...s} />
-            ))}
+            {mealsLoading ? (
+              Array.from({ length: 4 }).map((_, idx) => <div key={idx} className={styles.statsSkeleton} />)
+            ) : (
+              stats.map((s) => (
+                <StatsCard key={s.label} {...s} />
+              ))
+            )}
           </div>
 
           {/* Lower section */}
@@ -331,7 +329,7 @@ export default function DashboardPage() {
                   {Array.from({ length: goals.waterGlasses }).map((_, i) => (
                     <div 
                       key={i} 
-                      className={`${styles.glass} ${i < waterGlasses ? styles.filled : ""}`}
+                      className={`${styles.glass} ${i < waterIntake ? styles.filled : ""}`}
                       onClick={() => toggleWaterGlass(i)}
                       style={{ cursor: 'pointer' }}
                     >
@@ -339,7 +337,7 @@ export default function DashboardPage() {
                     </div>
                   ))}
                 </div>
-                <p className={styles.waterText}>{waterGlasses} / {goals.waterGlasses} glasses</p>
+                <p className={styles.waterText}>{waterIntake} / {goals.waterGlasses} glasses</p>
                 <p className={styles.waterTip}>Click to track your water intake!</p>
               </div>
 

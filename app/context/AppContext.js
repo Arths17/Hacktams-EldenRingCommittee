@@ -190,6 +190,9 @@ export function AppProvider({ children }) {
   const [allMeals, setAllMeals] = useState([]);
   const [todayMeals, setTodayMeals] = useState([]);
   const [weeklyMeals, setWeeklyMeals] = useState([]);
+  const [waterIntake, setWaterIntakeState] = useState(0);
+  const [workouts, setWorkouts] = useState([]);
+  const [workoutsLoading, setWorkoutsLoading] = useState(false);
   const [activityMetrics, setActivityMetrics] = useState({
     totalMeals: 0,
     loggedDays: 0,
@@ -201,6 +204,8 @@ export function AppProvider({ children }) {
   const [mealsLoading, setMealsLoading] = useState(false);
 
   const getLocalMealsKey = () => `cf-local-meals-${user?.username || "anon"}`;
+  const getLocalWaterKey = () => `cf-local-water-${user?.username || "anon"}`;
+  const getLocalWorkoutsKey = () => `cf-local-workouts-${user?.username || "anon"}`;
 
   const syncMealState = (meals) => {
     const normalizedMeals = (meals || [])
@@ -232,6 +237,41 @@ export function AppProvider({ children }) {
       localStorage.setItem(getLocalMealsKey(), JSON.stringify(meals || []));
     } catch {
       // no-op if storage is unavailable
+    }
+  };
+
+  const loadLocalWaterCache = () => {
+    try {
+      return Number(localStorage.getItem(getLocalWaterKey()) || 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const saveLocalWaterCache = (glasses) => {
+    try {
+      localStorage.setItem(getLocalWaterKey(), String(glasses));
+    } catch {
+      // no-op
+    }
+  };
+
+  const loadLocalWorkoutsCache = () => {
+    try {
+      const raw = localStorage.getItem(getLocalWorkoutsKey());
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveLocalWorkoutsCache = (entries) => {
+    try {
+      localStorage.setItem(getLocalWorkoutsKey(), JSON.stringify(entries || []));
+    } catch {
+      // no-op
     }
   };
 
@@ -274,7 +314,11 @@ export function AppProvider({ children }) {
       });
       setUserProfile(data.profile || {});
       
-      await refreshMealData(token);
+      await Promise.all([
+        refreshMealData(token),
+        fetchWaterIntake(token),
+        fetchWorkouts(token),
+      ]);
     } catch (error) {
       console.error("Failed to fetch user data:", error);
       router.push("/login");
@@ -324,6 +368,154 @@ export function AppProvider({ children }) {
 
   const fetchWeeklyMeals = async () => {
     await refreshMealData();
+  };
+
+  const fetchWaterIntake = async (token) => {
+    const userToken = token || user?.token;
+    if (!userToken) return;
+
+    const date = new Date().toISOString().split("T")[0];
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/water?date=${date}`, {
+        headers: {
+          "Authorization": `Bearer ${userToken}`,
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+      const parsed = await parseApiResponse(response, "Failed to load water intake");
+      if (parsed.ok && parsed.data?.success !== false) {
+        const glasses = Number(parsed.data?.glasses || 0);
+        setWaterIntakeState(glasses);
+        saveLocalWaterCache(glasses);
+        return;
+      }
+      setWaterIntakeState(loadLocalWaterCache());
+    } catch {
+      setWaterIntakeState(loadLocalWaterCache());
+    }
+  };
+
+  const saveWaterIntake = async (glasses) => {
+    const token = user?.token;
+    if (!token) return { success: false, error: "Not authenticated" };
+
+    const date = new Date().toISOString().split("T")[0];
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/water`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
+        body: JSON.stringify({ date, glasses })
+      });
+      const parsed = await parseApiResponse(response, "Failed to save water intake");
+      if (parsed.ok && parsed.data?.success !== false) {
+        const next = Number(parsed.data?.glasses ?? glasses ?? 0);
+        setWaterIntakeState(next);
+        saveLocalWaterCache(next);
+        return { success: true };
+      }
+
+      const safe = Math.max(0, Number(glasses) || 0);
+      setWaterIntakeState(safe);
+      saveLocalWaterCache(safe);
+      return { success: true, warning: parsed.error || "Saved locally" };
+    } catch (error) {
+      const safe = Math.max(0, Number(glasses) || 0);
+      setWaterIntakeState(safe);
+      saveLocalWaterCache(safe);
+      return { success: true, warning: error.message || "Saved locally" };
+    }
+  };
+
+  const fetchWorkouts = async (token) => {
+    const userToken = token || user?.token;
+    if (!userToken) return;
+
+    setWorkoutsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workouts`, {
+        headers: {
+          "Authorization": `Bearer ${userToken}`,
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+      const parsed = await parseApiResponse(response, "Failed to load workouts");
+      if (parsed.ok && parsed.data?.success !== false) {
+        const entries = parsed.data?.workouts || [];
+        setWorkouts(entries);
+        saveLocalWorkoutsCache(entries);
+      } else {
+        setWorkouts(loadLocalWorkoutsCache());
+      }
+    } catch {
+      setWorkouts(loadLocalWorkoutsCache());
+    } finally {
+      setWorkoutsLoading(false);
+    }
+  };
+
+  const addWorkout = async (workoutData) => {
+    const token = user?.token;
+    if (!token) return { success: false, error: "Not authenticated" };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workouts`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
+        body: JSON.stringify(workoutData)
+      });
+      const parsed = await parseApiResponse(response, "Failed to save workout");
+      if (parsed.ok && parsed.data?.success !== false) {
+        await fetchWorkouts(token);
+        return { success: true };
+      }
+
+      const fallback = { ...workoutData, id: workoutData.id || crypto.randomUUID() };
+      const next = [fallback, ...workouts];
+      setWorkouts(next);
+      saveLocalWorkoutsCache(next);
+      return { success: true, warning: parsed.error || "Saved locally" };
+    } catch (error) {
+      const fallback = { ...workoutData, id: workoutData.id || crypto.randomUUID() };
+      const next = [fallback, ...workouts];
+      setWorkouts(next);
+      saveLocalWorkoutsCache(next);
+      return { success: true, warning: error.message || "Saved locally" };
+    }
+  };
+
+  const deleteWorkout = async (workoutId) => {
+    const token = user?.token;
+    if (!token) return { success: false, error: "Not authenticated" };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workouts/${encodeURIComponent(workoutId)}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+      const parsed = await parseApiResponse(response, "Failed to delete workout");
+      if (parsed.ok && parsed.data?.success !== false) {
+        await fetchWorkouts(token);
+        return { success: true };
+      }
+    } catch {
+      // fall back below
+    }
+
+    const next = workouts.filter((entry) => String(entry.id) !== String(workoutId));
+    setWorkouts(next);
+    saveLocalWorkoutsCache(next);
+    return { success: true, warning: "Deleted locally" };
   };
 
   const addMeal = async (mealData) => {
@@ -441,6 +633,8 @@ export function AppProvider({ children }) {
     setAllMeals([]);
     setTodayMeals([]);
     setWeeklyMeals([]);
+    setWaterIntakeState(0);
+    setWorkouts([]);
     setActivityMetrics({
       totalMeals: 0,
       loggedDays: 0,
@@ -458,12 +652,20 @@ export function AppProvider({ children }) {
     todayMeals,
     weeklyMeals,
     activityMetrics,
+    waterIntake,
+    workouts,
+    workoutsLoading,
     loading,
     mealsLoading,
     refreshMealData,
     fetchTodayMeals,
     fetchMealsByDate,
     fetchWeeklyMeals,
+    fetchWaterIntake,
+    saveWaterIntake,
+    fetchWorkouts,
+    addWorkout,
+    deleteWorkout,
     addMeal,
     updateMeal,
     deleteMeal,
