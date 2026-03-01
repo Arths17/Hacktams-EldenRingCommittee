@@ -211,12 +211,13 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
-            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context
+            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context, analyze_profile
 
             nutrition_db.load()
-            nutrition_ctx  = nutrition_db.build_nutrition_context(profile)
-            research_ctx   = load_research_context()
-            system_full    = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile) + nutrition_ctx
+            analysis      = analyze_profile(profile)
+            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
+            research_ctx  = load_research_context()
+            system_full   = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile, analysis) + nutrition_ctx
 
             messages = [
                 {"role": "system", "content": system_full},
@@ -228,6 +229,7 @@ async def chat(request: Request):
                 if content:
                     yield content
         except Exception as e:
+            import traceback; traceback.print_exc()
             yield f"[Error: {e}]"
 
     return StreamingResponse(generate(), media_type="text/plain")
@@ -394,6 +396,7 @@ async def chat(request: Request):
         try:
             import ollama
             import nutrition_db
+<<<<<<< HEAD
             from model.model import SYSTEM_PROMPT, MODEL_NAME, load_research_context
 
             nutrition_db.load()
@@ -409,6 +412,20 @@ async def chat(request: Request):
                 {"role": "user", "content": message},
             ]
             
+=======
+            from model import SYSTEM_PROMPT, MODEL_NAME, profile_to_context, load_research_context, analyze_profile
+
+            nutrition_db.load()
+            analysis      = analyze_profile(profile)
+            nutrition_ctx = nutrition_db.build_nutrition_context(profile)
+            research_ctx  = load_research_context()
+            system_full   = SYSTEM_PROMPT + research_ctx + "\n\n" + profile_to_context(profile, analysis) + nutrition_ctx
+
+            messages = [
+                {"role": "system", "content": system_full},
+                {"role": "user",   "content": message},
+            ]
+>>>>>>> f92db6cf008dd3366da344836c48fdcd195f2d24
             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
             for chunk in stream:
                 content = chunk["message"]["content"]
