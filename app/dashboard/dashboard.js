@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useApp } from "../context/AppContext";
 import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import StatsCard from "../components/StatsCard/StatsCard";
 import MealLog from "../components/MealLog/MealLog";
 import styles from "./dashboard.module.css";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -185,59 +184,25 @@ function generateInsights(profile, goals) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [username, setUsername] = useState(null);
-  const [profile, setProfile] = useState({});
+  const { user, userProfile, todayMeals, weeklyMeals, mealsLoading } = useApp();
+  
   const [goals, setGoals] = useState({ calorieGoal: 2400, proteinG: 150, carbsG: 300, fatG: 65, waterGlasses: 8 });
   const [waterGlasses, setWaterGlasses] = useState(6); // Track water intake
-  const [todayMeals, setTodayMeals] = useState([]);
-  const [loadingMeals, setLoadingMeals] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (!token) { router.push("/login"); return; }
-    fetch(`${API_BASE_URL}/api/me`, {
-      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.success) {
-          router.push("/login");
-        } else {
-          setUsername(data.username);
-          const p = data.profile || {};
-          setProfile(p);
-          if (Object.keys(p).length > 0) {
-            setGoals(computeNutritionGoals(p));
-          }
-        }
-      })
-      .catch(() => router.push("/login"));
-      
     // Load water intake from localStorage
     const savedWater = localStorage.getItem("waterIntake");
     if (savedWater) {
       setWaterGlasses(parseInt(savedWater));
     }
+  }, []);
 
-    // Fetch today's meals for real nutrition totals
-    if (token) {
-      const today = new Date().toISOString().split('T')[0];
-      fetch(`${API_BASE_URL}/api/meals?date=${today}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true"
-        }
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && data.meals) {
-            setTodayMeals(data.meals);
-          }
-          setLoadingMeals(false);
-        })
-        .catch(() => setLoadingMeals(false));
+  useEffect(() => {
+    // Update goals when profile changes
+    if (userProfile && Object.keys(userProfile).length > 0) {
+      setGoals(computeNutritionGoals(userProfile));
     }
-  }, [router]);
+  }, [userProfile]);
 
   const toggleWaterGlass = (index) => {
     let newWaterCount;
@@ -252,12 +217,21 @@ export default function DashboardPage() {
     localStorage.setItem("waterIntake", newWaterCount.toString());
   };
 
-  const displayName = profile.name || username || "there";
+  const displayName = userProfile?.name || user?.username || "there";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const insights = generateInsights(profile, goals);
-  const hasProfile = Object.keys(profile).length > 0;
+  const insights = generateInsights(userProfile || {}, goals);
+  const hasProfile = userProfile && Object.keys(userProfile).length > 0;
+  const loggedMealsCount = todayMeals.length;
+  const weekRows = (weeklyMeals || []).map((d) => {
+    const day = new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }).charAt(0);
+    return { day, calories: d.calories || 0 };
+  });
+  const maxWeeklyCalories = weekRows.length > 0 ? Math.max(...weekRows.map((d) => d.calories)) : 0;
+  const avgWeeklyCalories = weekRows.length > 0
+    ? Math.round(weekRows.reduce((sum, d) => sum + d.calories, 0) / weekRows.length)
+    : 0;
 
   // Calculate today's totals from meals
   const LOGGED = todayMeals.reduce((acc, meal) => ({
@@ -270,7 +244,7 @@ export default function DashboardPage() {
   const stats = [
     {
       label: "Calories",
-      value: loadingMeals ? "..." : LOGGED.calories.toLocaleString(),
+      value: mealsLoading ? "..." : LOGGED.calories.toLocaleString(),
       unit: "kcal",
       icon: "🔥",
       progress: Math.min(Math.round((LOGGED.calories / goals.calorieGoal) * 100), 110),
@@ -279,7 +253,7 @@ export default function DashboardPage() {
     },
     {
       label: "Protein",
-      value: loadingMeals ? "..." : LOGGED.protein.toString(),
+      value: mealsLoading ? "..." : LOGGED.protein.toString(),
       unit: "g",
       icon: "💪",
       progress: Math.min(Math.round((LOGGED.protein / goals.proteinG) * 100), 110),
@@ -288,7 +262,7 @@ export default function DashboardPage() {
     },
     {
       label: "Carbs",
-      value: loadingMeals ? "..." : LOGGED.carbs.toString(),
+      value: mealsLoading ? "..." : LOGGED.carbs.toString(),
       unit: "g",
       icon: "🌾",
       progress: Math.min(Math.round((LOGGED.carbs / goals.carbsG) * 100), 110),
@@ -297,7 +271,7 @@ export default function DashboardPage() {
     },
     {
       label: "Fat",
-      value: loadingMeals ? "..." : LOGGED.fat.toString(),
+      value: mealsLoading ? "..." : LOGGED.fat.toString(),
       unit: "g",
       icon: "🥑",
       progress: Math.min(Math.round((LOGGED.fat / goals.fatG) * 100), 110),
@@ -314,7 +288,7 @@ export default function DashboardPage() {
       
       <CampusFuelNav />
       <div className={styles.main}>
-        <Header title="Dashboard" username={username || ""} />
+        <Header title="Dashboard" username={user?.username || ""} />
         <div className={styles.content}>
 
           {/* Welcome Banner */}
@@ -322,9 +296,9 @@ export default function DashboardPage() {
             <div className={styles.bannerText}>
               <h2 className={styles.bannerTitle}>{greeting}, {displayName}! 👋</h2>
               <p className={styles.bannerSub}>
-                {hasProfile && profile.goal
-                  ? <>Goal: <strong>{capitalize(profile.goal)}</strong> · Diet: <strong>{capitalize(profile.diet_type || "—")}</strong> · You&apos;ve logged <strong>4 meals</strong> today.</>
-                  : <>You&apos;ve logged <strong>4 meals</strong> today. You&apos;re on track to meet your daily goals.</>
+                {hasProfile && userProfile.goal
+                  ? <>Goal: <strong>{capitalize(userProfile.goal)}</strong> · Diet: <strong>{capitalize(userProfile.diet_type || "—")}</strong> · You&apos;ve logged <strong>{loggedMealsCount} meals</strong> today.</>
+                  : <>You&apos;ve logged <strong>{loggedMealsCount} meals</strong> today. You&apos;re on track to meet your daily goals.</>
                 }
               </p>
             </div>
@@ -387,40 +361,40 @@ export default function DashboardPage() {
                 <div className={styles.card}>
                   <h3 className={styles.cardTitle}>📋 Your Stats</h3>
                   <div className={styles.tips}>
-                    {profile.height && (
+                    {userProfile?.height && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>📏</span>
-                        <span className={styles.tipText}>Height: {profile.height}</span>
+                        <span className={styles.tipText}>Height: {userProfile.height}</span>
                       </div>
                     )}
-                    {profile.weight && (
+                    {userProfile?.weight && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>⚖️</span>
-                        <span className={styles.tipText}>Weight: {profile.weight}</span>
+                        <span className={styles.tipText}>Weight: {userProfile.weight}</span>
                       </div>
                     )}
-                    {profile.sleep_quality && (
+                    {userProfile?.sleep_quality && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>😴</span>
-                        <span className={styles.tipText}>Sleep quality: {capitalize(profile.sleep_quality)}</span>
+                        <span className={styles.tipText}>Sleep quality: {capitalize(userProfile.sleep_quality)}</span>
                       </div>
                     )}
-                    {profile.stress_level && (
+                    {userProfile?.stress_level && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>😰</span>
-                        <span className={styles.tipText}>Stress level: {profile.stress_level} / 10</span>
+                        <span className={styles.tipText}>Stress level: {userProfile.stress_level} / 10</span>
                       </div>
                     )}
-                    {profile.energy_level && (
+                    {userProfile?.energy_level && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>⚡</span>
-                        <span className={styles.tipText}>Energy level: {profile.energy_level} / 10</span>
+                        <span className={styles.tipText}>Energy level: {userProfile.energy_level} / 10</span>
                       </div>
                     )}
-                    {profile.mood && (
+                    {userProfile?.mood && (
                       <div className={styles.tip}>
                         <span className={styles.tipIcon}>💭</span>
-                        <span className={styles.tipText}>Mood: {capitalize(profile.mood)}</span>
+                        <span className={styles.tipText}>Mood: {capitalize(userProfile.mood)}</span>
                       </div>
                     )}
                   </div>
@@ -431,17 +405,23 @@ export default function DashboardPage() {
               <div className={styles.card}>
                 <h3 className={styles.cardTitle}>📅 This Week</h3>
                 <div className={styles.weekRow}>
-                  {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
+                  {weekRows.map((row, i) => (
                     <div key={i} className={styles.dayCol}>
                       <div
                         className={styles.dayBar}
-                        style={{ height: `${[60, 80, 45, 90, 70, 30, 0][i]}%` }}
+                        style={{ height: `${maxWeeklyCalories > 0 ? Math.round((row.calories / maxWeeklyCalories) * 100) : 0}%` }}
                       />
-                      <span className={styles.dayLabel}>{day}</span>
+                      <span className={styles.dayLabel}>{row.day}</span>
                     </div>
                   ))}
                 </div>
-                <p className={styles.weekNote}>Avg. {Math.round(goals.calorieGoal * 0.88).toLocaleString()} kcal/day this week</p>
+                <p className={styles.weekNote}>Avg. {avgWeeklyCalories.toLocaleString()} kcal/day this week</p>
+                <div className={styles.tips}>
+                  <div className={styles.tip}>
+                    <span className={styles.tipIcon}>📈</span>
+                    <span className={styles.tipText}>{avgWeeklyCalories >= goals.calorieGoal ? "You’re meeting your energy target." : "You’re below goal; add one nutrient-dense snack."}</span>
+                  </div>
+                </div>
               </div>
 
             </div>

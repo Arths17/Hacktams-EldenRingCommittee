@@ -2,119 +2,52 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useApp } from "../context/AppContext";
 import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import styles from "./progress.module.css";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export default function ProgressPage() {
   const router = useRouter();
-  const [username, setUsername] = useState(null);
-  const [profile, setProfile] = useState({});
+  const { user, userProfile, weeklyMeals, mealsLoading, fetchWeeklyMeals, activityMetrics } = useApp();
+  
   const [timeRange, setTimeRange] = useState("week"); // week, month, year
   const [churnRisk, setChurnRisk] = useState(null);
-  const [weeklyData, setWeeklyData] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-
-  const achievements = [
-    { id: 1, icon: "🔥", title: "7 Day Streak", description: "Logged meals for 7 days in a row", unlocked: true },
-    { id: 2, icon: "💪", title: "Protein Goal", description: "Hit protein goal 5 days this week", unlocked: true },
-    { id: 3, icon: "🥗", title: "Healthy Week", description: "Maintained calorie deficit", unlocked: true },
-    { id: 4, icon: "🏋️", title: "Workout Warrior", description: "Completed 4 workouts this week", unlocked: false },
-    { id: 5, icon: "💧", title: "Hydration Hero", description: "Drank 8 glasses of water daily", unlocked: false },
-    { id: 6, icon: "🌟", title: "Perfect Month", description: "Logged every day this month", unlocked: false },
-  ];
-
-  const milestones = [
-    { date: "2026-02-28", title: "Started using CampusFuel", type: "start" },
-    { date: "2026-02-25", title: "First 5-pound loss", type: "weight" },
-    { date: "2026-02-20", title: "Completed survey", type: "profile" },
-    { date: "2026-02-15", title: "First AI chat", type: "ai" },
-  ];
 
   useEffect(() => {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (!token) { 
-      router.push("/login"); 
-      return; 
+    // Fetch weekly meals data when component mounts
+    if (user) {
+      fetchWeeklyMeals();
     }
-    
-    // Fetch user profile
-    fetch(`${API_BASE_URL}/api/me`, {
-      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.success) {
-          router.push("/login");
-        } else {
-          setUsername(data.username);
-          setProfile(data.profile || {});
-        }
-      })
-      .catch(() => router.push("/login"));
+  }, [user]);
 
-    // Fetch weekly meals data
-    if (token) {
-      fetchWeeklyMeals(token);
-    }
-  }, [router]);
-
-  const fetchWeeklyMeals = async (token) => {
-    try {
-      // Fetch meals for the past 7 days
-      const today = new Date();
-      const mealsPromises = [];
-      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        mealsPromises.push(
-          fetch(`${API_BASE_URL}/api/meals?date=${dateStr}`, {
-            headers: {
-              "Authorization": `Bearer ${token}`,
-              "ngrok-skip-browser-warning": "true"
-            }
-          }).then(r => r.json())
-        );
-      }
-
-      const results = await Promise.all(mealsPromises);
-      const weeklyDataCalculated = results.map((result, index) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() - (6 - index));
-        const dayName = dayNames[date.getDay()];
-        
-        const meals = result.success ? result.meals : [];
-        const totals = meals.reduce((acc, meal) => ({
-          calories: acc.calories + (meal.total?.calories || 0),
-          protein: acc.protein + (meal.total?.protein || 0),
-          workouts: acc.workouts // Keep workouts at 0 for now
-        }), { calories: 0, protein: 0, workouts: 0 });
-
-        return {
-          day: dayName,
-          ...totals
-        };
-      });
-
-      setWeeklyData(weeklyDataCalculated);
-    } catch (error) {
-      console.error("Failed to fetch weekly meals:", error);
-      setWeeklyData([]);
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  // Transform weeklyMeals data to include day names
+  const weeklyData = weeklyMeals.map((dayData) => {
+    const date = new Date(dayData.date);
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return {
+      day: dayNames[date.getDay()],
+      calories: dayData.calories,
+      protein: dayData.protein,
+      workouts: 0 // Placeholder for future workout tracking
+    };
+  });
 
   const maxCalories = weeklyData.length > 0 ? Math.max(...weeklyData.map(d => d.calories)) : 0;
   const maxProtein = weeklyData.length > 0 ? Math.max(...weeklyData.map(d => d.protein)) : 0;
   const avgCalories = weeklyData.length > 0 ? Math.round(weeklyData.reduce((sum, d) => sum + d.calories, 0) / weeklyData.length) : 0;
   const avgProtein = weeklyData.length > 0 ? Math.round(weeklyData.reduce((sum, d) => sum + d.protein, 0) / weeklyData.length) : 0;
   const totalWorkouts = weeklyData.reduce((sum, d) => sum + d.workouts, 0);
+  const achievements = activityMetrics.achievements || [];
+  const profileMilestone = userProfile && Object.keys(userProfile).length > 0
+    ? [{ date: new Date().toISOString().split("T")[0], title: "Completed survey profile", type: "profile" }]
+    : [];
+  const milestones = [...profileMilestone, ...(activityMetrics.milestones || [])]
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const engagementScore = Math.min(
+    100,
+    Math.round((activityMetrics.loggedDays || 0) * 4 + (activityMetrics.currentStreak || 0) * 8)
+  );
 
   return (
     <div className={styles.layout}>
@@ -123,7 +56,7 @@ export default function ProgressPage() {
       
       <CampusFuelNav />
       <div className={styles.main}>
-        <Header title="Progress & Analytics" username={username || ""} />
+        <Header title="Progress & Analytics" username={user?.username || ""} />
         <div className={styles.content}>
 
           {/* Summary Stats */}
@@ -132,7 +65,7 @@ export default function ProgressPage() {
               <span className={styles.statIcon}>📅</span>
               <div className={styles.statInfo}>
                 <p className={styles.statLabel}>Current Streak</p>
-                <p className={styles.statValue}>7 days</p>
+                <p className={styles.statValue}>{activityMetrics.currentStreak || 0} days</p>
               </div>
             </div>
             <div className={styles.statCard}>
@@ -185,7 +118,7 @@ export default function ProgressPage() {
                 </div>
               </div>
               <div className={styles.chart}>
-                {loadingData ? (
+                {mealsLoading ? (
                   <div className={styles.chartNote}>Loading weekly data...</div>
                 ) : weeklyData.length === 0 ? (
                   <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
@@ -210,7 +143,7 @@ export default function ProgressPage() {
             <div className={styles.chartCard}>
               <h2 className={styles.chartTitle}>💪 Protein Intake</h2>
               <div className={styles.chart}>
-                {loadingData ? (
+                {mealsLoading ? (
                   <div className={styles.chartNote}>Loading weekly data...</div>
                 ) : weeklyData.length === 0 ? (
                   <div className={styles.chartNote}>No meal data available yet. Start logging meals!</div>
@@ -257,7 +190,15 @@ export default function ProgressPage() {
           <div className={styles.timelineCard}>
             <h2 className={styles.timelineTitle}>📜 Your Journey</h2>
             <div className={styles.timeline}>
-              {milestones.map((milestone, idx) => (
+              {milestones.length === 0 ? (
+                <div className={styles.timelineItem}>
+                  <div className={styles.timelineDot} />
+                  <div className={styles.timelineContent}>
+                    <p className={styles.timelineDate}>No milestones yet</p>
+                    <p className={styles.timelineText}>Log your first meal to start your journey timeline.</p>
+                  </div>
+                </div>
+              ) : milestones.map((milestone, idx) => (
                 <div key={idx} className={styles.timelineItem}>
                   <div className={styles.timelineDot} />
                   <div className={styles.timelineContent}>
@@ -277,9 +218,9 @@ export default function ProgressPage() {
             </p>
             <div className={styles.engagementMeter}>
               <div className={styles.meterBar}>
-                <div className={styles.meterFill} style={{ width: "85%" }} />
+                <div className={styles.meterFill} style={{ width: `${engagementScore}%` }} />
               </div>
-              <p className={styles.meterLabel}>85% Engagement Score</p>
+              <p className={styles.meterLabel}>{engagementScore}% Engagement Score</p>
             </div>
             <div className={styles.engagementTips}>
               <div className={styles.engagementTip}>

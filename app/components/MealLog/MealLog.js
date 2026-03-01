@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useApp } from "../../context/AppContext";
 import styles from "./MealLog.module.css";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const mealTypeColors = {
   Breakfast: "#145A32",
@@ -20,39 +18,7 @@ const mealTypeIcons = {
 };
 
 export default function MealLog() {
-  const [meals, setMeals] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchTodaysMeals();
-  }, []);
-
-  const fetchTodaysMeals = async () => {
-    try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`${API_BASE_URL}/api/meals?date=${today}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-
-      const data = await response.json();
-      if (data.success && data.meals) {
-        setMeals(data.meals);
-      }
-    } catch (error) {
-      console.error("Failed to fetch meals:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { todayMeals, mealsLoading } = useApp();
 
   const getMealName = (meal) => {
     if (meal.items && meal.items.length > 0) {
@@ -71,12 +37,12 @@ export default function MealLog() {
         <a href="/meals" className={styles.addBtn}>+ Add Meal</a>
       </div>
       <div className={styles.list}>
-        {loading ? (
+        {mealsLoading ? (
           <div className={styles.loading}>Loading meals...</div>
-        ) : meals.length === 0 ? (
+        ) : todayMeals.length === 0 ? (
           <div className={styles.emptyState}>No meals logged today</div>
         ) : (
-          meals.map((meal, index) => (
+          todayMeals.map((meal, index) => (
             <div key={meal.timestamp || index} className={styles.row}>
               <div className={styles.iconCol}>
                 <span className={styles.icon}>{mealTypeIcons[meal.type] || "🍽️"}</span>

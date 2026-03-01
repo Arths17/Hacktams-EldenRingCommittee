@@ -1,20 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useApp } from "../context/AppContext";
 import CampusFuelNav from "../components/Navbar/CampusFuelNav";
 import Header from "../components/Header/Header";
 import styles from "./meals.module.css";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export default function MealsPage() {
-  const router = useRouter();
-  const [username, setUsername] = useState(null);
-  const [meals, setMeals] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user, todayMeals, mealsLoading, addMeal: addMealToContext, updateMeal: updateMealInContext, deleteMeal: deleteMealFromContext } = useApp();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingMealId, setEditingMealId] = useState(null);
   const [newMeal, setNewMeal] = useState({
     type: "Breakfast",
     time: "",
@@ -28,52 +24,11 @@ export default function MealsPage() {
     fat: ""
   });
 
-  useEffect(() => {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (!token) { 
-      router.push("/login"); 
-      return; 
-    }
-    fetch(`${API_BASE_URL}/api/me`, {
-      headers: { "Authorization": `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.success) {
-          router.push("/login");
-        } else {
-          setUsername(data.username);
-          // Fetch meals after authentication
-          fetchMeals(token);
-        }
-      })
-      .catch(() => router.push("/login"));
-  }, [router]);
-
-  const fetchMeals = async (token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/meals`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-      const data = await response.json();
-      if (data.success && data.meals) {
-        setMeals(data.meals);
-      }
-    } catch (error) {
-      console.error("Failed to fetch meals:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const totalDailyNutrition = meals.reduce((acc, meal) => ({
-    calories: acc.calories + meal.total.calories,
-    protein: acc.protein + meal.total.protein,
-    carbs: acc.carbs + meal.total.carbs,
-    fat: acc.fat + meal.total.fat,
+  const totalDailyNutrition = todayMeals.reduce((acc, meal) => ({
+    calories: acc.calories + (meal.total?.calories || 0),
+    protein: acc.protein + (meal.total?.protein || 0),
+    carbs: acc.carbs + (meal.total?.carbs || 0),
+    fat: acc.fat + (meal.total?.fat || 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
   const handleAddItem = () => {
@@ -120,39 +75,38 @@ export default function MealsPage() {
       date: new Date().toISOString().split('T')[0]
     };
 
-    try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/api/meals`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: JSON.stringify(mealData)
-      });
+    const result = editingMealId
+      ? await updateMealInContext(editingMealId, { ...mealData, id: editingMealId })
+      : await addMealToContext(mealData);
 
-      const data = await response.json();
-      if (data.success) {
-        // Refresh meals list
-        await fetchMeals(token);
-        setShowAddModal(false);
-        setNewMeal({
-          type: "Breakfast",
-          time: "",
-          items: []
-        });
-      } else {
-        alert('Failed to save meal: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error saving meal:', error);
-      alert('Failed to save meal. Please try again.');
+    if (result.success) {
+      setShowAddModal(false);
+      setEditingMealId(null);
+      setNewMeal({
+        type: "Breakfast",
+        time: "",
+        items: []
+      });
+    } else {
+      alert('Failed to save meal: ' + (result.error || 'Unknown error'));
     }
   };
 
-  const deleteMeal = (id) => {
-    setMeals(meals.filter(m => m.id !== id));
+  const handleEditMeal = (meal) => {
+    setEditingMealId(meal.id || meal.timestamp);
+    setNewMeal({
+      type: meal.type || "Breakfast",
+      time: meal.time || "",
+      items: meal.items || [],
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDeleteMeal = async (id) => {
+    const result = await deleteMealFromContext(id);
+    if (!result.success) {
+      alert("Failed to delete meal: " + (result.error || "Unknown error"));
+    }
   };
 
   const goals = {
@@ -176,7 +130,7 @@ export default function MealsPage() {
       
       <CampusFuelNav />
       <div className={styles.main}>
-        <Header title="Meal Logging" username={username || ""} />
+        <Header title="Meal Logging" username={user?.username || ""} />
         <div className={styles.content}>
 
           {/* Daily Summary */}
@@ -242,7 +196,7 @@ export default function MealsPage() {
           </div>
 
           {/* Add Meal Button */}
-          <button className={styles.addMealButton} onClick={() => setShowAddModal(true)}>
+          <button className={styles.addMealButton} onClick={() => { setEditingMealId(null); setNewMeal({ type: "Breakfast", time: "", items: [] }); setShowAddModal(true); }}>
             <span className={styles.addIcon}>+</span>
             Log New Meal
           </button>
@@ -250,20 +204,27 @@ export default function MealsPage() {
           {/* Meal List */}
           <div className={styles.mealsSection}>
             <h2 className={styles.mealsTitle}>Today&apos;s Meals</h2>
-            {meals.length === 0 ? (
+            {mealsLoading ? (
+              <p className={styles.noMeals}>Loading meals...</p>
+            ) : todayMeals.length === 0 ? (
               <p className={styles.noMeals}>No meals logged yet. Start by adding your first meal!</p>
             ) : (
               <div className={styles.mealsList}>
-                {meals.map((meal, index) => (
+                {todayMeals.map((meal, index) => (
                   <div key={meal.timestamp || meal.id || index} className={styles.mealCard}>
                     <div className={styles.mealHeader}>
                       <div>
                         <h3 className={styles.mealType}>{meal.type}</h3>
                         <p className={styles.mealTime}>{meal.time}</p>
                       </div>
-                      <button className={styles.deleteButton} onClick={() => deleteMeal(meal.timestamp || meal.id)}>
-                        🗑️
-                      </button>
+                      <div className={styles.mealActions}>
+                        <button className={styles.deleteButton} onClick={() => handleEditMeal(meal)}>
+                          ✏️
+                        </button>
+                        <button className={styles.deleteButton} onClick={() => handleDeleteMeal(meal.id || meal.timestamp)}>
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                     <div className={styles.mealItems}>
                       {meal.items.map((item, idx) => (
@@ -276,10 +237,10 @@ export default function MealsPage() {
                     <div className={styles.mealTotal}>
                       <span className={styles.totalLabel}>Total:</span>
                       <div className={styles.totalNutrients}>
-                        <span className={styles.nutrient}>🔥 {meal.total.calories} cal</span>
-                        <span className={styles.nutrient}>💪 {meal.total.protein}g</span>
-                        <span className={styles.nutrient}>🌾 {meal.total.carbs}g</span>
-                        <span className={styles.nutrient}>🥑 {meal.total.fat}g</span>
+                        <span className={styles.nutrient}>🔥 {meal.total?.calories || 0} cal</span>
+                        <span className={styles.nutrient}>💪 {meal.total?.protein || 0}g</span>
+                        <span className={styles.nutrient}>🌾 {meal.total?.carbs || 0}g</span>
+                        <span className={styles.nutrient}>🥑 {meal.total?.fat || 0}g</span>
                       </div>
                     </div>
                   </div>
@@ -292,8 +253,8 @@ export default function MealsPage() {
           {showAddModal && (
             <div className={styles.modal} onClick={() => setShowAddModal(false)}>
               <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                <button className={styles.modalClose} onClick={() => setShowAddModal(false)}>×</button>
-                <h2 className={styles.modalTitle}>Log New Meal</h2>
+                <button className={styles.modalClose} onClick={() => { setShowAddModal(false); setEditingMealId(null); }}>×</button>
+                <h2 className={styles.modalTitle}>{editingMealId ? "Edit Meal" : "Log New Meal"}</h2>
 
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Meal Type</label>
@@ -376,7 +337,7 @@ export default function MealsPage() {
                 </div>
 
                 <div className={styles.modalActions}>
-                  <button className={styles.cancelButton} onClick={() => setShowAddModal(false)}>
+                  <button className={styles.cancelButton} onClick={() => { setShowAddModal(false); setEditingMealId(null); }}>
                     Cancel
                   </button>
                   <button 
@@ -384,7 +345,7 @@ export default function MealsPage() {
                     onClick={handleSaveMeal}
                     disabled={newMeal.items.length === 0}
                   >
-                    Save Meal
+                    {editingMealId ? "Update Meal" : "Save Meal"}
                   </button>
                 </div>
               </div>

@@ -147,6 +147,7 @@ const STEPS = [
 
 const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const WORKOUT_SLOTS = ["Morning","Afternoon","Evening","Night","I don't work out"];
+const NUMERIC_ONLY_KEYS = new Set(["age"]);
 
 export default function SurveyPage() {
   const router = useRouter();
@@ -172,6 +173,21 @@ export default function SurveyPage() {
   const q = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
+  function handleTextInputChange(rawValue) {
+    if (!NUMERIC_ONLY_KEYS.has(q.key)) {
+      setCurrent(rawValue);
+      if (error === "Please enter numbers only.") setError("");
+      return;
+    }
+
+    if (/^\d*$/.test(rawValue)) {
+      setCurrent(rawValue);
+      if (error === "Please enter numbers only.") setError("");
+    } else {
+      setError("Please enter numbers only.");
+    }
+  }
+
   function handleNext() {
     // Serialize interactive pickers into a string value
     let val = current.trim();
@@ -193,6 +209,20 @@ export default function SurveyPage() {
       setError("Please make a selection before continuing.");
       return;
     }
+
+    if (NUMERIC_ONLY_KEYS.has(q.key) && !/^\d+$/.test(val)) {
+      setError("Please enter numbers only.");
+      return;
+    }
+
+    if (q.key === "age") {
+      const ageNum = Number(val);
+      if (Number.isNaN(ageNum) || ageNum < 10 || ageNum > 100) {
+        setError("Please enter a valid age between 10 and 100.");
+        return;
+      }
+    }
+
     setError("");
     // Don't lowercase classpicker (preserves day names like Mon, Tue)
     const updated = { ...answers, [q.key]: q.type === "classpicker" ? val : val.toLowerCase() };
@@ -341,8 +371,10 @@ export default function SurveyPage() {
               className={styles.input}
               placeholder={q.placeholder}
               value={current}
-              onChange={(e) => setCurrent(e.target.value)}
+              onChange={(e) => handleTextInputChange(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleNext()}
+              inputMode={NUMERIC_ONLY_KEYS.has(q.key) ? "numeric" : undefined}
+              pattern={NUMERIC_ONLY_KEYS.has(q.key) ? "[0-9]*" : undefined}
               autoFocus
             />
           )}

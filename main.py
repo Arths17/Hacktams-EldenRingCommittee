@@ -22,6 +22,7 @@ import jwt as _jwt
 import logging
 from typing import cast as _cast, Optional
 from datetime import datetime
+from uuid import uuid4
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1274,6 +1275,8 @@ async def log_meal(request: Request):
         # Add timestamp if not provided
         if "timestamp" not in data:
             data["timestamp"] = datetime.utcnow().isoformat()
+        if "id" not in data or not data.get("id"):
+            data["id"] = str(uuid4())
         
         # Store in Supabase or local file
         if USE_SUPABASE and user_id:
@@ -1370,6 +1373,148 @@ async def get_meals(request: Request, date: Optional[str] = None):
     
     except Exception as e:
         logger.error(f"Get meals error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.put(
+    "/api/meals/{meal_id}",
+    tags=["Meals"],
+    summary="Update a meal",
+    description="Update a logged meal by id",
+)
+async def update_meal(request: Request, meal_id: str):
+    """Update an existing meal by id."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+        data = await request.json()
+
+        if not data.get("type") or not data.get("items"):
+            return JSONResponse(
+                {"success": False, "error": "Missing required fields: type, items", "error_code": "VALIDATION_ERROR"},
+                status_code=422,
+            )
+
+        data["id"] = meal_id
+
+        if USE_SUPABASE and user_id:
+            try:
+                _sb.table("meals").update(data).eq("user_id", user_id).eq("id", meal_id).execute()
+                logger.info(f"✓ Meal updated: {username} ({meal_id}) (Supabase)")
+                return JSONResponse({"success": True})
+            except Exception as e:
+                logger.warning(f"Supabase meal update failed: {e}, falling back to local")
+
+        meals_path = _profile_path(username).replace(".json", "_meals.json")
+        try:
+            with open(meals_path, "r") as f:
+                meals = json.load(f)
+        except FileNotFoundError:
+            meals = []
+
+        updated = False
+        for idx, meal in enumerate(meals):
+            if str(meal.get("id", "")) == meal_id or str(meal.get("timestamp", "")) == meal_id:
+                meals[idx] = {
+                    **meal,
+                    **data,
+                    "id": meal_id,
+                    "timestamp": data.get("timestamp") or meal.get("timestamp") or datetime.utcnow().isoformat(),
+                }
+                updated = True
+                break
+
+        if not updated:
+            return JSONResponse(
+                {"success": False, "error": "Meal not found", "error_code": "NOT_FOUND"},
+                status_code=404,
+            )
+
+        with open(meals_path, "w") as f:
+            json.dump(meals, f, indent=2)
+
+        logger.info(f"✓ Meal updated: {username} ({meal_id}) (local)")
+        return JSONResponse({"success": True})
+
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "error": "Invalid JSON", "error_code": "VALIDATION_ERROR"},
+            status_code=422,
+        )
+    except Exception as e:
+        logger.error(f"Update meal error: {e}", exc_info=True)
+        return JSONResponse(
+            {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
+            status_code=500,
+        )
+
+
+@app.delete(
+    "/api/meals/{meal_id}",
+    tags=["Meals"],
+    summary="Delete a meal",
+    description="Delete a logged meal by id",
+)
+async def delete_meal(request: Request, meal_id: str):
+    """Delete an existing meal by id."""
+    try:
+        payload = _decode_token(request)
+        if not payload:
+            return JSONResponse(
+                {"success": False, "error": "Not authenticated", "error_code": "AUTH_FAILED"},
+                status_code=401,
+            )
+
+        username = payload["username"]
+        user_id = payload.get("user_id")
+
+        if USE_SUPABASE and user_id:
+            try:
+                _sb.table("meals").delete().eq("user_id", user_id).eq("id", meal_id).execute()
+                logger.info(f"✓ Meal deleted: {username} ({meal_id}) (Supabase)")
+                return JSONResponse({"success": True})
+            except Exception as e:
+                logger.warning(f"Supabase meal delete failed: {e}, falling back to local")
+
+        meals_path = _profile_path(username).replace(".json", "_meals.json")
+        try:
+            with open(meals_path, "r") as f:
+                meals = json.load(f)
+        except FileNotFoundError:
+            return JSONResponse(
+                {"success": False, "error": "Meal not found", "error_code": "NOT_FOUND"},
+                status_code=404,
+            )
+
+        filtered = [
+            meal for meal in meals
+            if str(meal.get("id", "")) != meal_id and str(meal.get("timestamp", "")) != meal_id
+        ]
+
+        if len(filtered) == len(meals):
+            return JSONResponse(
+                {"success": False, "error": "Meal not found", "error_code": "NOT_FOUND"},
+                status_code=404,
+            )
+
+        with open(meals_path, "w") as f:
+            json.dump(filtered, f, indent=2)
+
+        logger.info(f"✓ Meal deleted: {username} ({meal_id}) (local)")
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        logger.error(f"Delete meal error: {e}", exc_info=True)
         return JSONResponse(
             {"success": False, "error": "Internal server error", "error_code": "INTERNAL_SERVER_ERROR"},
             status_code=500,

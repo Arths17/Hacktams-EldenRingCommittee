@@ -211,6 +211,11 @@
   margin-bottom: 1rem;
 }
 
+.mealActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .mealType {
   font-size: 1.25rem;
   font-weight: 600;
