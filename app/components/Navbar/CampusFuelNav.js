@@ -26,9 +26,6 @@ export default function CampusFuelNav() {
           <a href="/ai" className={styles.btnAi}>
             🤖 AI Coach
           </a>
-          <a href="/login" className={styles.btnPrimary}>
-            Sign in
-          </a>
         </div>
       </div>
     </header>
